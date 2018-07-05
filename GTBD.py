@@ -1,130 +1,144 @@
-## GTBD project to synchronise data in TRICS and Hyperion ## 
+## GTBD project to synchronise data in TRICS and GTWH ## 
 
 ## Import Python libraries
-import difflib as dl
+from Levenshtein import *
 import numpy as np
 import os
 import pandas as pd
 import pyodbc
 
+
 ## Initialize variables
-filepath = ''
-fullFileAdd = ''
-access_Col_Name = []
-question_Marks = []
-quests = ''
+company_dict = {'Matched_Company':[], 'Matched_CCIF':[]}
+#company_dict = {'Matched_Company':[], 'Matched_CCIF':[], 'Matched_Flag':[]}
 
-## Refresh mySQL table's column names 
-def get_mySQL_ColumnNames(filepath):
-    
-    '''
-    Function Parameters:
-    filepath: Common path where Microsoft Access files are stored
-    (1) Need to enclose filepath in inverted commas
-    (2) Include 'r' in front of filepath when using function
-    e.g. r'C:\path_to_files'
-    '''    
-    
-    # Establish connection to MySQL database
-    conn_mySQL = pyodbc.connect(r'DRIVER={MySQL ODBC 5.3 ANSI Driver};'
-                                r'SERVER=203.24.43.91;'
-                                r'PORT=3306;'
-                                r'DATABASE=gtbd;'
-                                r'UID=root;'
-                                r'PWD=root')
-    cursor_mySQL = conn_mySQL.cursor()
+## Establish connection to mySQL server
+def start_mySQL():
+    conn = pyodbc.connect(r'DRIVER={MySQL ODBC 5.3 ANSI Driver};'
+                            r'SERVER=203.24.43.91;'
+                            r'PORT=3306;'
+                            r'DATABASE=gtbd;'
+                            r'UID=root;'
+                            r'PWD=root')
+    cursor = conn.cursor()
+    return conn, cursor
 
-    # If trics_remittance_beneficiary table exists, delete table 
-    cursor_mySQL.execute("DROP TABLE IF EXISTS trics_rm_worldwide")            
+
+## Run query to return every trics table in mySQL server
+def return_DB():   
+    # Execute SQL to list tables
+    cursor.execute('SHOW TABLES;')
+    response = cursor.fetchall()
+    mySQLtables = []
+    for row in response:
+        if 'trics_rm_worldwide' in row[0]:
+            mySQLtables.append(row[0]) 
+    return mySQLtables
+  
     
-    # Establish connection to one Microsoft Access file in specified filepath
-    for each_Access_File in os.listdir(filepath):
-        if each_Access_File.endswith('.accdb'):
-            fullFileAdd = filepath + '\\' + each_Access_File
-            break
-    
-    if fullFileAdd == '':
-        print('There are no Microsoft Access files in specified filepath. Please check!')
+## Query all entities with valid customer names & C_CIF
+def return_table_data(table):
+    df_trics_remit = pd.read_sql('SELECT REMITTER_ENGLISH, REMITTER_C_CIF FROM %s WHERE REMITTER_C_CIF IS NOT NULL;' 
+                         % table, con = conn)
+    df_trics_remit.dropna(inplace = True)
+
+    df_trics_ben = pd.read_sql('SELECT BENEFICIARY_ENGLISH, BENEFICIARY_C_CIF FROM %s WHERE BENEFICIARY_C_CIF IS NOT NULL;' 
+                         % table, con = conn)
+    df_trics_ben.dropna(inplace = True)
+
+    df_customers = pd.read_sql('SELECT CUST_NAME, C_CIF_NO FROM t_gtbd_custlist WHERE CUST_NAME IS NOT NULL;', 
+                               con = conn)
+    df_customers.dropna(inplace = True)
+    df_customers.drop_duplicates(subset = ['CUST_NAME', 'C_CIF_NO'], inplace = True)
+
+    return df_trics_remit, df_trics_ben, df_customers
+
+
+## Perform fuzzy matching using Levenshtein distance
+def get_closest_match(previous_string, sample_string, df, fun):
+    # Initialize variables
+    best_match = ''
+    highest_ratio = 0
+    # Compare sample_string with previous_string to identify duplicates
+    if sample_string == previous_string:
+        # If it is duplicate, skip fuzzy matching for efficiency
+        best_match = previous_string
+        # If it is not duplicate, perform subsequent matching
     else:
-        conn_Access = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};'
-                                    'DBQ=' + fullFileAdd + ';')
-        cursor_Access = conn_Access.cursor()
-    
-        # Store table column names and data types
-        res = cursor_Access.execute('SELECT * FROM TRICS_RM_WORLDWIDE')
-        for tuple in res.description:               
-            if tuple[1] == float:
-                access_Col_Name.append(tuple[0] + ' DOUBLE')
-                question_Marks.append('?')
-            elif tuple[1] == str:
-                access_Col_Name.append(tuple[0] + ' VARCHAR(255)')
-                question_Marks.append('?')
-            elif tuple[1] == int:
-                access_Col_Name.append(tuple[0] + ' INT(11)')
-                question_Marks.append('?')
-            else:
-                print('Data type is not created. Please update MRDD!')
-            
-        # Create mySQL table with column names and data types
-        sql = 'CREATE TABLE gtbd.trics_rm_worldwide (' + ', '.join(access_Col_Name) + ');'
-        cursor_mySQL.execute(sql)
-
-    conn_Access.close()
-    conn_mySQL.close()
-    quests = ','.join(question_Marks)
-    return quests
-    
-## Download related information from Microsoft Access files
-def get_lists_from_access(filepath):
-    
-    '''
-    Function Parameters:
-    filepath: Common path where Microsoft Access files are stored
-    (1) Need to enclose filepath in inverted commas
-    (2) Include 'r' in front of filepath when using function
-    e.g. r'C:\path_to_files'
-    '''
-    quests = get_mySQL_ColumnNames(filepath)
-
-    # Get all Microsoft Access filenames from specified filepath
-    ''' Note: Please store all related Microsoft Access files in the designated filepath '''
-    for each_Access_File in os.listdir(filepath):
-        if each_Access_File.endswith('.accdb'):
-            fullFileAdd = filepath + '\\' + each_Access_File
-
-            # Establish connection to Microsoft Access files in specified filepath
-            conn_Access = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};'
-                                         r'DBQ=' + fullFileAdd + ';')
-            cursor_Access = conn_Access.cursor()
-            cursor_Access.execute('SELECT * FROM TRICS_RM_WORLDWIDE')
-            
-            # Upload Microsoft Access file content into MySQL database
-            count = 0
-            row = cursor_Access.fetchone()
-            while row is not None:
-                row = cursor_Access.fetchone()    
+        # Compare sample_string with current_string in actual customer list
+        for current_string in df.values.tolist():
+            if sample_string == current_string[0]:
+                # If total match, skip fuzzy matching for efficiency 
+                highest_ratio =  1
+                best_match = current_string[0]
                 
-                # Establish connection to MySQL database
-                conn_mySQL = pyodbc.connect(r'DRIVER={MySQL ODBC 5.3 ANSI Driver};'
-                                r'SERVER=203.24.43.91;'
-                                r'PORT=3306;'
-                                r'DATABASE=gtbd;'
-                                r'UID=root;'
-                                r'PWD=root')
-                cursor_mySQL = conn_mySQL.cursor()
-                
-                # Update MySQL database
-                cursor_mySQL.execute('INSERT INTO trics_remittance_beneficiary VALUES ({0})'.format(quests), row)
-                conn_mySQL.commit()     
-                count += 1
-            
-                print('Data for ' + each_Access_File + ' has been uploaded successfully! ' + 
-                  'Total records: ' + str(count))
-                 
-            # Close Microsoft Access file connection
-            conn_Access.close()
+            elif (sample_string.split(' ')[0] == current_string[0].split(' ')[0]) and (highest_ratio != 1):
+                # If it is not total match and pass first word matching, proceed with fuzzy matching 
+                current_score = fun(sample_string, current_string[0])
+                if(current_score > highest_ratio):
+                    highest_ratio = current_score
+                    best_match = current_string[0]
+    return best_match
     
-    # Close mySQL connection    
-    conn_mySQL.close()
+def LevRatioMerge(df1, df2, fun):
+    temp_string = ''
+    for row in df1.itertuples():
+        best_match = get_closest_match(temp_string, row[1], df2, fun)
+        if best_match == '':
+            ccif = ''
+        else:
+            ccif = df2[df2['CUST_NAME'] == best_match].iloc[0]['C_CIF_NO']
+        temp_string = best_match
+        company_dict['Matched_Company'].append(best_match)
+        company_dict['Matched_CCIF'].append(ccif)
+
+      
+## Execute conditions
+conn, cursor = start_mySQL()
+mySQLtables = return_DB()
+df_trics_remit, df_trics_ben, df_customers = return_table_data(mySQLtables[0])
+LevRatioMerge(df_trics_remit, df_customers, ratio)  
+#LevRatioMerge(df_trics_ben, df_customers, ratio)  
 
 
+
+#def name_match(trics_cust, cust_list):
+#    name = dl.get_close_matches(trics_cust, cust_list, 1, 0.8)
+#    print(name)
+#    # Valid match and first word is identical
+#    for i in range(len(sample.flatten)):
+#        if len(name) > 0 and sample.split(" ") == name[0].split(" ")[0]:
+#        matched_cust.append(name[0])
+##            matched_CCIF.append(df_customers.loc[df_customers['CUST_NAME']==name[0], 'C_CIF_NO'].tolist()[0])
+#            matched_flag.append('1')            
+#        # No valid match or valid match and first word is not identical
+#        else:
+#            matched_cust.append('')
+##            matched_CCIF.append('')
+#            matched_flag.append('0')    
+
+#    matched_cust = []
+#    matched_CCIF = []
+#    matched_flag = []
+#    
+#    for company in sample_list:
+#        name = dl.get_close_matches(company, actual_list, 1, 0.8)
+#        print(name)
+#        # Valid match and first word is identical
+#        if len(name) > 0 and company.split(" ")[0] == name[0].split(" ")[0]:
+#            matched_cust.append(name[0])
+##            matched_CCIF.append(df_customers.loc[df_customers['CUST_NAME']==name[0], 'C_CIF_NO'].tolist()[0])
+#            matched_flag.append('1')            
+#        # No valid match or valid match and first word is not identical
+#        else:
+#            matched_cust.append('')
+##            matched_CCIF.append('')
+#            matched_flag.append('0')
+#        
+#    return matched_cust, matched_flag
+
+#    # Display results in DataFrame
+#    df_customers ['Matched_Cust'] = matched_cust
+#    df_customers ['Matched_CCIF'] = matched_CCIF
+#    df_customers ['Matched_Flag'] = matched_flag
+    
