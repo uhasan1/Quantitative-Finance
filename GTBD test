@@ -1,0 +1,2 @@
+lst = [str(row[1]) for row in df.itertuples()]
+df['genius'] = lst
