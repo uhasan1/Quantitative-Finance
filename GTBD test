@@ -1,9 +1,7 @@
-lst = [str(row[1]) for row in df.itertuples()]
-df['genius'] = lst
+a = pd.DataFrame({'Company': ['ABC CO LTD', 'DEF CO', 'XYZ INC']})
+b = pd.DataFrame({'LONG': ['CORPORATION', 'COMPANY'], 'SHORT': ['CO LTD', 'CO']})
+
 for string in b.values.tolist():
     a['Company'] = [re.sub(r'\b%s\b' % string[1], string[0], company) for company in a['Company']]
-    
-
-
 
 # print(df.tail()) to inspect the entries
