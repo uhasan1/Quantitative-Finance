@@ -137,3 +137,17 @@ df_trics_remit, df_trics_ben, df_customers = return_table_data(mySQLtables[0])
 #LevRatioRemit(df_trics_remit, df_customers, ratio)  
 #LevRatioBen(df_trics_ben, df_customers, ratio)  
 ## may need to use lists instead of dataframe!!!
+
+#######
+import threading
+import time
+
+start = time.time() # Indicate start of timer
+t1 = threading.Thread(target = LevRatioRemit, args = (df_trics_remit, df_customers, ratio))
+t2 = threading.Thread(target = LevRatioBen, args = (df_trics_ben, df_customers, ratio))
+
+t1.start()
+t2.start()
+
+t1.join()
+t2.join()
