@@ -5,3 +5,4 @@ for string in b.values.tolist():
     a['Company'] = [re.sub(r'\b%s\b' % string[1], string[0], company) for company in a['Company']]
 
 # print(df.tail()) to inspect the entries
+# https://engineering.upside.com/a-beginners-guide-to-optimizing-pandas-code-for-speed-c09ef2c6a4d6
