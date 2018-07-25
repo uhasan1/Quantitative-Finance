@@ -6,3 +6,8 @@ for string in b.values.tolist():
 
 # print(df.tail()) to inspect the entries
 # https://engineering.upside.com/a-beginners-guide-to-optimizing-pandas-code-for-speed-c09ef2c6a4d6
+# https://maxpowerwastaken.github.io/blog/pandas-dont-apply-_-vectorize/
+
+# In terms of speed, according to Mark Lutz's book Learning Python: list comprehension > map > for loop
+# https://stackoverflow.com/questions/43312776/performance-is-slow-when-replacing-a-string-in-a-pandas-dataframe-using-a-dict
+## May wish to consider bringing back str.replace (only if necessary)
