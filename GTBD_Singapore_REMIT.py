@@ -255,10 +255,10 @@ def get_closest_match(sample_string, df, fun):
     else:
         # Compare sample_string with current_string in actual customer list
         for current_string in df.itertuples():
-            if (sample_string[7].split(' ')[0:2] == current_string[3].split(' ')[0:2]) and \
-                 ([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[7]] \
+            if (sample_string[6].split(' ')[0:2] == current_string[3].split(' ')[0:2]) and \
+                 ([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[6]] \
                  == [ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string[3]]) and \
-                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[7]]) >= 1 and \
+                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[6]]) >= 1 and \
                  len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string[3]]) >= 1 and \
                  (highest_ratio < 0.998):
                 # If it is not total match but pass first word/country matching, proceed with fuzzy matching 
@@ -267,8 +267,8 @@ def get_closest_match(sample_string, df, fun):
                     highest_ratio = current_score
                     best_match = current_string[1]
                     
-            elif (sample_string[7].split()[0:2] == current_string[3].split()[0:2]) and \
-                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[7]]) == 0 and \
+            elif (sample_string[6].split()[0:2] == current_string[3].split()[0:2]) and \
+                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[6]]) == 0 and \
                  len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string[3]]) == 0 and \
                  (highest_ratio < 0.998):
                  # If it is not total match and fail all other conditions above, proceed with fuzzy matching 
