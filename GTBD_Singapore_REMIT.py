@@ -153,16 +153,16 @@ def parse_table_data():
     df_ccc = pd.read_excel('CountriesCapitalsCities.xlsx')    
     for ccc in df_ccc['ENTITIES'].values.tolist():
         df_trics_remit['REMITTER_ENGLISH_CCC'] = df_trics_remit['REMITTER_ENGLISH_CCC'].apply(lambda x: 
-                                                re.split(r'\b%s\b' % ccc[0], x)[0] + ccc[0] if (re.search(r'\b%s\b' % ccc[0], x)) and \
-                                                (len(re.split(' ', re.split(r'\b%s\b' % ccc[0], x)[0] + ccc[0])) > 2)
+                                                re.split(r'\b%s\b' % ccc, x)[0] + ccc if (re.search(r'\b%s\b' % ccc, x)) and \
+                                                (len(re.split(' ', re.split(r'\b%s\b' % ccc, x)[0] + ccc)) > 2)
                                                 else x)
         df_trics_ben['BENEFICIARY_ENGLISH_CCC'] = df_trics_ben['BENEFICIARY_ENGLISH_CCC'].apply(lambda x: 
-                                                 re.split(r'\b%s\b' % ccc[0], x)[0] + ccc[0] if (re.search(r'\b%s\b' % ccc[0], x)) and \
-                                                 (len(re.split(' ', re.split(r'\b%s\b' % ccc[0], x)[0] + ccc[0])) > 2) 
+                                                 re.split(r'\b%s\b' % ccc, x)[0] + ccc if (re.search(r'\b%s\b' % ccc, x)) and \
+                                                 (len(re.split(' ', re.split(r'\b%s\b' % ccc, x)[0] + ccc)) > 2) 
                                                  else x)
         df_customers['CUST_NAME_CCC'] = df_customers['CUST_NAME_CCC'].apply(lambda x: 
-                                       re.split(r'\b%s\b' % ccc[0], x)[0] + ccc[0] if (re.search(r'\b%s\b' % ccc[0], x)) and \
-                                       (len(re.split(' ', re.split(r'\b%s\b' % ccc[0], x)[0] + ccc[0])) > 2)
+                                       re.split(r'\b%s\b' % ccc, x)[0] + ccc if (re.search(r'\b%s\b' % ccc, x)) and \
+                                       (len(re.split(' ', re.split(r'\b%s\b' % ccc, x)[0] + ccc)) > 2)
                                        else x)
     
     return df_trics_remit, df_trics_ben, df_customers, df_ccc
@@ -239,16 +239,16 @@ def get_closest_match(sample_string, df, fun):
     best_match = ''
     highest_ratio = 0
     # Compare sample_string with GDWH DataFrame to identify exact match
-    if len(df[df['CUST_NAME'].str.replace(' ', '') == sample_string[4].replace(' ', '')]['CUST_NAME']) == 1:
+    if len(df[df['CUST_NAME'].str.replace(' ', '') == sample_string[4].replace(' ', '')]['CUST_NAME']) >= 1:
         # If it is exact match, skip fuzzy matching for efficiency
         best_match = df[df['CUST_NAME'].str.replace(' ', '') == sample_string[4].replace(' ', '')].iloc[0]['CUST_NAME']
         highest_ratio =  1
         # If it is not exact match, perform subsequent matching with modified names, i.e. NEW AND CO
-    elif len(df[df['CUST_NAME_NEW'].str.replace(' ', '') == sample_string[6].replace(' ', '')]['CUST_NAME_NEW']) == 1:
+    elif len(df[df['CUST_NAME_NEW'].str.replace(' ', '') == sample_string[6].replace(' ', '')]['CUST_NAME_NEW']) >= 1:
         # If it is exact match, skip fuzzy matching for efficiency
         best_match = df[df['CUST_NAME_NEW'].str.replace(' ', '') == sample_string[6].replace(' ', '')].iloc[0]['CUST_NAME']
         highest_ratio =  0.999
-    elif len(df[df['CUST_NAME_CCC'].str.replace(' ', '') == sample_string[7].replace(' ', '')]['CUST_NAME_CCC']) == 1:
+    elif len(df[df['CUST_NAME_CCC'].str.replace(' ', '') == sample_string[7].replace(' ', '')]['CUST_NAME_CCC']) >= 1:
         # If it is exact match, skip fuzzy matching for efficiency
         best_match = df[df['CUST_NAME_CCC'].str.replace(' ', '') == sample_string[7].replace(' ', '')].iloc[0]['CUST_NAME']
         highest_ratio =  0.998
@@ -256,9 +256,9 @@ def get_closest_match(sample_string, df, fun):
         # Compare sample_string with current_string in actual customer list
         for current_string in df.itertuples():
             if (sample_string[7].split(' ')[0:2] == current_string[3].split(' ')[0:2]) and \
-                 ([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[6]] \
+                 ([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[7]] \
                  == [ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string[3]]) and \
-                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[6]]) >= 1 and \
+                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[7]]) >= 1 and \
                  len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string[3]]) >= 1 and \
                  (highest_ratio < 0.998):
                 # If it is not total match but pass first word/country matching, proceed with fuzzy matching 
@@ -268,7 +268,7 @@ def get_closest_match(sample_string, df, fun):
                     best_match = current_string[1]
                     
             elif (sample_string[7].split()[0:2] == current_string[3].split()[0:2]) and \
-                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[6]]) == 0 and \
+                 len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string[7]]) == 0 and \
                  len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string[3]]) == 0 and \
                  (highest_ratio < 0.998):
                  # If it is not total match and fail all other conditions above, proceed with fuzzy matching 
