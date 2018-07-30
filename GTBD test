@@ -24,3 +24,18 @@ def replacer(row):
 #            return row
     
 a['Company_New'] = a['Company'].apply(replacer)
+
+a = pd.DataFrame({'Company': ['ABC CO LTD', 'DEF CO', 'XYZ INC']})
+b = pd.DataFrame({'SHORT': ['CO LTD', 'CO'], 'LONG': ['COMPANY LIMITED', 'COMPANY']})
+arr_1 = {'Company_New' : []}
+def replacer(series):
+    arr = series.values.tolist()
+    for abb in b.values.tolist():
+        arr = series.values.tolist()
+        for ele in arr:
+            if abb[0] in ele:
+                arr = re.sub(r'\b%s\b' % abb[0], abb[1], arr[%s])
+#            arr = re.sub(r'\b%s\b' % abb[0], abb[1], arr)
+#        else:
+    
+replacer(a['Company'])
