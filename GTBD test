@@ -20,7 +20,7 @@ a['Company'].str.replace('(' + pattern + ')', '').str.strip()
 a['SHORT'] = a['Company'].str.extract(r'\b%s\b' % '(' + pattern + ')', expand = False)
 a['SHORT'].fillna(a['Company'][a['SHORT'].isnull()], inplace = True)
 a = pd.merge(a, b, how = 'left', on = 'SHORT')
-a['Company'] = a.dropna(subset = ['SHORT'])['Company'].str.replace(r'\b%s\b' % '(' + "|".join(a['SHORT'].dropna()) + ')', '') + a['LONG'].dropna()
+a['Company'] = a.dropna(subset = ['LONG'])['Company'].str.replace(r'\b%s\b' % '(' + "|".join(a['SHORT'].dropna()) + ')', '') + a['LONG'].dropna()
 a['Company'].fillna(a['SHORT'][a['Company'].isnull()], inplace = True)
 del a['SHORT'], a['LONG']
 
