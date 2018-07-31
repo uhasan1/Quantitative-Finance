@@ -136,11 +136,6 @@ def parse_table_data():
     # Standardize each company's abbreviation and country/capital/city in all 3 DataFrames 
     df_std = pd.read_excel('CompanyAbbreviations.xlsx')  
     df_ccc = pd.read_excel('CountriesCapitalsCities.xlsx')
-         
-    pattern = "|".join(b['Short'])
-    a['Company'].str.replace('(' + pattern + ')', 'sigh')
-    a['Company'].str.replace('(' + pattern + ')', '').str.strip()
-    a['Company'].str.extract(r'\b%s\b' % '(' + pattern + ')', expand = False)
     
     
     for abb in df_std['SHORT'].values.tolist():
