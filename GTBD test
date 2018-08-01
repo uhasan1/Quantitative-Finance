@@ -29,3 +29,4 @@ del a['SHORT'], a['LONG']
 #a['Company'] = a.dropna().apply(lambda x: x['Company'].replace(x['SHORT'],x['LONG']), axis=1)
 
 #edit the abu dhabi
+df['TEMP_CCC'] = df['TEMP_CCC'][(df['TEMP_CCC_NO1'] != df['TEMP_CCC']) & (df['TEMP_CCC_NO2'] != df['TEMP_CCC']) & (df['TEMP_CCC_NO1'] + df['TEMP_CCC_NO2'] != df['TEMP_CCC'])]
