@@ -50,142 +50,221 @@ def return_table_data(table):
     return df_, df_gdwh
 
 
+############################################### START ###############################################################
+
 ## Parse data in standardized format
 def parse_table_data(): 
     # Create df1 containing LC Applicant details using df_
     df1 = df_.copy()
     df1.drop(['BENEFICIARY', 'BENEFICIARY_C_CIF'], axis = 1, inplace = True)  
     df1.sort_values(by = 'APPLICANT', inplace = True)
-    # Drop all non-alphanumeric characters from LC Applicant customer names
-    df1['APPLICANT_NEW'] = df1['APPLICANT'].str.replace(r'[^\w\s]', ' ')
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.replace(r'\b%s\b' % 'AND', '')  
-    # Drop all leading (supsicious) numbers from LC Applicant customer names
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'][df1['APPLICANT_NEW'].str[0:5].replace(' ', '').str.isdigit()].str.replace(r'^\d+', '')
-    df1['APPLICANT_NEW'].fillna(df1['APPLICANT'][df1['APPLICANT_NEW'].isnull()], inplace = True)
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.replace(r'^\d+\s\d+', '')
-    # Drop all potential addresses from LC Applicant customer names
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.split(r'\b%s\b' % 'NO').str[0]
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.split(r'\b%s\b' % 'SEE').str[0]
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.split(r'\s\d+').str[0]
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.split(r'\D\d+').str[0]
-    # Strip redundant spaces
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.replace('[\s{Zs}]{2,}', ' ')
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.strip()  
+    df1 = clean_data(df1, 'APPLICANT', 'APPLICANT_NEW')
 
     # Create df2 containing LC Beneficiary details using df_
     df2 = df_.copy()
     df2.drop(['APPLICANT', 'APPLICANT_C_CIF'], axis = 1, inplace= True)  
     df2.sort_values(by = 'BENEFICIARY', inplace = True)
-    # Drop all non-alphanumeric characters from LC Bene customer names
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY'].str.replace(r'[^\w\s]', ' ')
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.replace(r'\b%s\b' % 'AND', '')  
-    # Drop all leading (supsicious) numbers from LC Bene customer names
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'][df2['BENEFICIARY_NEW'].str[0:5].replace(' ', '').str.isdigit()].str.replace(r'^\d+', '')
-    df2['BENEFICIARY_NEW'].fillna(df2['BENEFICIARY'][df2['BENEFICIARY_NEW'].isnull()], inplace = True)
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.replace(r'^\d+\s\d+', '')
-    # Drop all potential addresses from LC Bene customer names
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.split(r'\b%s\b' % 'NO').str[0]
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.split(r'\b%s\b' % 'SEE').str[0]
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.split(r'\s\d+').str[0]
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.split(r'\D\d+').str[0]
-    # Strip redundant spaces
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.replace('[\s{Zs}]{2,}', ' ')
-    df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.strip()  
+    df2 = clean_data(df2, 'BENEFICIARY', 'BENEFICIARY_NEW')
 
     # Create df_customers using df_gdwh
     df_customers = df_gdwh.copy()
-    # Drop all duplicates and non-alphanumeric characters from GDWH customer names
+    # Drop all duplicates fromm GDWH customer names
     df_customers.dropna(inplace = True)    
     df_customers.drop_duplicates('CUST_NAME', inplace = True)
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME'].str.replace(r'[^\w\s]', ' ')
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.replace(r'\b%s\b' % 'AND', '')
-    # Drop all leading (supsicious) numbers from GDWH customer names
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'][df_customers['CUST_NAME_NEW'].str[0:5].replace(' ', '').str.isdigit()].str.replace(r'^\d+', '')
-    df_customers['CUST_NAME_NEW'].fillna(df_customers['CUST_NAME'][df_customers['CUST_NAME_NEW'].isnull()], inplace = True)
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.replace(r'^\d+\s\d+', '')
-    # Drop all potential addresses from GDWH customer names
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.split(r'\b%s\b' % 'NO').str[0]
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.split(r'\b%s\b' % 'SEE').str[0]
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.split(r'\s\d+').str[0]
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.split(r'\D\d+').str[0]
-    # Strip redundant spaces
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.replace('[\s{Zs}]{2,}', ' ')
-    df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.strip()  
+    df_customers = clean_data(df_customers, 'CUST_NAME', 'CUST_NAME_NEW')
     
     # Standardize each country's abbreviation in all 3 DataFrames
-    df_std = pd.read_excel('CountryAbbreviations.xlsx')
-    pattern = "|".join(df_std['SHORT'])
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.replace(r'\b%s\b' % pattern, )
-    for abb in df_std.values.tolist():
-        df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.replace(r'\b%s\b' % abb[1], abb[0])
-        df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.replace(r'\b%s\b' % abb[1], abb[0])
-        df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.replace(r'\b%s\b' % abb[1], abb[0])
-
-    # Standardize each sector's abbreviations in all 3 DataFrames
-    df_std = pd.read_excel('SectorAbbreviations.xlsx')
-    for abb in df_std.values.tolist():
-        df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].str.replace(r'\b%s\b' % abb[1], abb[0])
-        df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].str.replace(r'\b%s\b' % abb[1], abb[0])
-        df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].str.replace(r'\b%s\b' % abb[1], abb[0])
+    df1 = parse_abb('CountryAbbreviations.xlsx', df1, 'APPLICANT_NEW')
+    df2 = parse_abb('CountryAbbreviations.xlsx', df2, 'BENEFICIARY_NEW')
+    df_customers = parse_abb('CountryAbbreviations.xlsx', df_customers, 'CUST_NAME_NEW')
+    
+    # Standardize each sector's abbreviation in all 3 DataFrames
+    df1 = parse_abb('SectorAbbreviations.xlsx', df1, 'APPLICANT_NEW')
+    df2 = parse_abb('SectorAbbreviations.xlsx', df2, 'BENEFICIARY_NEW')
+    df_customers = parse_abb('SectorAbbreviations.xlsx', df_customers, 'CUST_NAME_NEW')
     
     # Remove company's abbreviation if it is found at the beginning of string
-    df_std = pd.read_excel('CompanyAbbreviations.xlsx')  
-    df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'][df1['APPLICANT_NEW'].str[0:5].replace(' ', '').str.isdigit()].str.replace(r'^\d+', '')
-    
-    
-    # Standardize each company's abbreviation and country/capital/city in all 3 DataFrames 
-    df_std = pd.read_excel('CompanyAbbreviations.xlsx')  
-    df_ccc = pd.read_excel('CountriesCapitalsCities.xlsx')
-    
-    
-    for abb in df_std['SHORT'].values.tolist():
-        df1['APPLICANT_NEW'] = df1['APPLICANT_NEW'].apply(lambda x: 
-                                          re.sub(r'\b%s\b' %abb[1], abb[0], x) if (re.search(r'\b%s\b' % abb[1], x)) and \
-                                          (x.split()[0] != abb[1]) else x)
-        df2['BENEFICIARY_NEW'] = df2['BENEFICIARY_NEW'].apply(lambda x: 
-                                          re.sub(r'\b%s\b' %abb[1], abb[0], x) if (re.search(r'\b%s\b' % abb[1], x)) and \
-                                          (x.split()[0] != abb[1]) else x)
-        df_customers['CUST_NAME_NEW'] = df_customers['CUST_NAME_NEW'].apply(lambda x: 
-                                        re.sub(r'\b%s\b' %abb[1], abb[0], x) if (re.search(r'\b%s\b' % abb[1], x)) and \
-                                        (x.split()[0] != abb[1]) else x)
-    
-    
-    
+    df1 = del_begin_abb('CompanyAbbreviations.xlsx', df1, 'APPLICANT_NEW')
+    df2 = del_begin_abb('CompanyAbbreviations.xlsx', df2, 'BENEFICIARY_NEW')
+    df_customers = del_begin_abb('CompanyAbbreviations.xlsx', df_customers, 'CUST_NAME_NEW')
+  
     # Create a new column to store LC data
     df1['APPLICANT_CCC'] = df1['APPLICANT_NEW']
     df2['BENEFICIARY_CCC'] = df2['BENEFICIARY_NEW']
     df_customers['CUST_NAME_CCC'] = df_customers['CUST_NAME_NEW']
-        
-    # Find country/capital/city and drop all words after country/capital/city for second-level matching
+    df1['APPLICANT_CO'] = df1['APPLICANT_NEW']
+    df2['BENEFICIARY_CO'] = df2['BENEFICIARY_NEW']
+    df_customers['CUST_NAME_CO'] = df_customers['CUST_NAME_NEW']
+    
+    # Standardize remaining companies' abbreviation and country/capital/city in all 3 DataFrames 
+    df1 = parse_ccc_abb('CompanyAbbreviations.xlsx', 'CountriesCapitalsCities.xlsx', df1, 'APPLICANT_CCC', 'APPLICANT_CO')
+    df2 = parse_ccc_abb('CompanyAbbreviations.xlsx', 'CountriesCapitalsCities.xlsx', df2, 'BENEFICIARY_CCC', 'BENEFICIARY_CO')
+    df_customers = parse_ccc_abb('CompanyAbbreviations.xlsx', 'CountriesCapitalsCities.xlsx', df_customers, 'CUST_NAME_CCC', 'CUST_NAME_CO')
+    return df1, df2, df_customers
 
+def clean_data(df, dseries_old, dseries_new):
+    # Drop all non-alphanumeric characters from selected DataFrame customer names
+    df[dseries_new] = df[dseries_old].str.replace(r'[^\w\s]', ' ')
+    df[dseries_new] = df[dseries_new].str.replace(r'\b%s\b' % 'AND', '')  
+    # Drop all leading (supsicious) numbers from selected DataFrame customer names
+    df[dseries_new] = df[dseries_new][df[dseries_new].str[0:5].replace(' ', '').str.isdigit()].str.replace(r'^\d+', '')
+    df[dseries_new].fillna(df[dseries_old][df[dseries_new].isnull()], inplace = True)
+    df[dseries_new] = df[dseries_new].str.replace(r'[^\w\s]', ' ')
+    df[dseries_new] = df[dseries_new].str.replace(r'\b%s\b' % 'AND', '')  
+    df[dseries_new] = df[dseries_new].str.replace(r'^\d+\s\d+', '')
+    # Drop all potential addresses from selected DataFrame customer names
+    df[dseries_new] = df[dseries_new].str.split(r'\b%s\b' % 'NO').str[0]
+    df[dseries_new] = df[dseries_new].str.split(r'\b%s\b' % 'SEE').str[0]
+    df[dseries_new] = df[dseries_new].str.split(r'\s\d+').str[0]
+    df[dseries_new] = df[dseries_new].str.split(r'\D\d+').str[0]
+    # Strip redundant spaces
+    df[dseries_new] = df[dseries_new].str.replace('[\s]{2,}', ' ')
+    df[dseries_new] = df[dseries_new].str.strip()      
+    return df
+    
+def parse_abb(file, df, dseries):
+    # Load relevant files
+    df_std = pd.read_excel(file)
+    # Create a string to join all abbreviations
+    pattern = (r'\b%s\b' % '|').join(df_std['SHORT'])
+    # List DataFrame rows with abbreviations, regardless of their position
+    df['SHORT'] = df[dseries].str.extract('(' + r'\b%s\b' % pattern + ')', expand = False)
+    df['TEMP'] = df['SHORT']
+    df['TEMP'].fillna(df[dseries][df['SHORT'].isnull()], inplace = True)
+    # Do a left join with the full name
+    df = pd.merge(df, df_std, how = 'left', on = 'SHORT')
+    # Replace abbreviated DataFrame rows with full name
+    df[dseries] = df.dropna(subset = ['SHORT']).apply(lambda x: x[dseries].replace(x['SHORT'],x['LONG']), axis=1)
+    df[dseries].fillna(df['TEMP'][df[dseries].isnull()], inplace = True)
+    # Remove redundant columns
+    del df['SHORT'], df['LONG'], df['TEMP']
+    return df
+
+def del_begin_abb(file, df, dseries):
+    # Load relevant files
+    df_std = pd.read_excel(file)
+    # Create a string to join all abbreviations
+    pattern = (r'\b%s\b' % '|').join(df_std['SHORT'])
+    # List DataFrame rows with abbreviations
+    df['SHORT'] = df[dseries].str.extract('(' + r'\b%s\b' % pattern + ')', expand = False)
+    df['TEMP'] = df['SHORT']
+    df['TEMP'].fillna(df[dseries][df['SHORT'].isnull()], inplace = True)
+    # Create a string to join all abbreviations
+    pattern = (r'\b%s^\b' % '|').join(df_std['SHORT'].dropna())
+    # Remove abbreviations from relevant DataFrame rows that begin with same abbreviation
+    df[dseries] = df.dropna(subset = ['SHORT'])[dseries].str.replace('(' + r'^\b%s\b' % pattern + ')', '').str.strip()
+    df[dseries].fillna(df['TEMP'][df[dseries].isnull()], inplace = True)
+    # Remove redundant columns
+    del df['SHORT'], df['TEMP']
+    return df
+
+def parse_ccc_abb(file_std, file_ccc, df, dseries, dseries2):
+    # Load relevant files - country/capital/city and company abbreviations
+    df_std = pd.read_excel(file_std) 
+    df_ccc = pd.read_excel(file_ccc)
+    # Create a string to join all abbreviations for each file
+    pattern_std = (r'\b%s\b' % '|').join(df_std['SHORT'])
+    pattern_ccc = (r'\b%s\b' % '|').join(df_ccc['ENTITIES'])
+    # List DataFrame rows with country/capital/city abbreviations
+    df['CCC'] = df[dseries].str.extract('(' + r'\b%s\b' % pattern_ccc + ')', expand = False)
+    df['TEMP_CCC'] = df['CCC']
+    df['TEMP_CCC_NO1'] = df['CCC']
+    df['TEMP_CCC_NO2'] = df['CCC']
+    df['TEMP_CCC'].fillna(df[dseries][df['CCC'].isnull()], inplace = True)
+    df['TEMP_CCC_NO1'] = df.dropna(subset = ['CCC'])[dseries].str.split(r'\s').str[0]
+    df['TEMP_CCC_NO2'] = df.dropna(subset = ['CCC'])[dseries].str.split(r'\s').str[1]
+    # List DataFrame rows that do not begin with country (i.e. first 2 words must not contain country)
+    df['TEMP_CCC'] = df['TEMP_CCC'][(df['TEMP_CCC_NO1'] != df['TEMP_CCC']) & (df['TEMP_CCC_NO2'] != df['TEMP_CCC'])]
+    # Remove any text after country/capital/city abbreviations
+    df['TEMP_CCC'] = df.dropna(subset = ['TEMP_CCC'])[dseries].str.split('(' + r'\b%s\b' % pattern_ccc + ')').str[0] + df.dropna(subset = ['TEMP_CCC'])['CCC'] 
+    df['TEMP_CCC'].fillna(df[dseries][df['TEMP_CCC'].isnull()], inplace = True)
+    df[dseries] = df['TEMP_CCC']
+    # Remove company abbreviation
+    df['TEMP_CCC'] = df['TEMP_CCC'].str.split('(' + r'\b%s\b' % pattern_std + ')').str[0].str.strip()
+    df[dseries2] = df['TEMP_CCC']
+    # Remove redundant columns
+    del df['CCC'], df['TEMP_CCC'], df['TEMP_CCC_NO1'], df['TEMP_CCC_NO2']
+    return df
+
+############################################### END #################################################################  
+    
+
+############################################### START ###############################################################    
+
+## Simple Fuzzy matching
+def simple_fuzzy_match():    
+    # Create df_simple containing LC details using df_
+    df_simple = df_.copy()
+    # Create additional empty columns in df_simple to store simple fuzzy matches
+#    df_simple['APPLICANT_COMPANY_BEST_MATCH'] = ''
+#    df_simple['APPLICANT_CCIF_BEST_MATCH'] = ''
+#    df_simple['APPLICANT_HIGHEST_RATIO'] = ''
+#    df_simple['APPLICANT_UPDATE_TAG'] = ''
+#    df_simple['BENEFICIARY_COMPANY_BEST_MATCH'] = ''
+#    df_simple['BENEFICIARY_CCIF_BEST_MATCH'] = ''
+#    df_simple['BENEFICIARY_HIGHEST_RATIO'] = ''
+#    df_simple['BENEFICIARY_UPDATE_TAG'] = ''
+    
+    # Lower level matching: Perform exact matching between modified columns in both source files
+    df1_simple = df1.copy()
+    df1_simple = exact_match_modified_co(df1_simple, 'APPLICANT_CO', 'APPLICANT_COMPANY_BEST_MATCH', 'APPLICANT_CCIF_BEST_MATCH', 
+                                         'APPLICANT_HIGHEST_RATIO', 'APPLICANT_UPDATE_TAG', df_cust_simple)
+    df2_simple = df2.copy()
+    df2_simple = exact_match_modified_co(df2_simple, 'BENEFICIARY_CO', 'BENEFICIARY_COMPANY_BEST_MATCH', 'BENEFICIARY_CCIF_BEST_MATCH', 
+                                         'BENEFICIARY_HIGHEST_RATIO', 'BENEFICIARY_UPDATE_TAG', df_cust_simple)
     
     
+    # Highest level matching: Perform exact matching between original columns in both source files
+#    df1_simple = df1.copy()
+#    df1_simple = exact_match_original(df1_simple, 'APPLICANT', 'APPLICANT_COMPANY_BEST_MATCH', 'APPLICANT_CCIF_BEST_MATCH', 
+#                                      'APPLICANT_HIGHEST_RATIO', 'APPLICANT_UPDATE_TAG', df_cust_simple)
+#    df2_simple = df2.copy()
+#    df2_simple = exact_match_original(df2_simple, 'BENEFICIARY', 'BENEFICIARY_COMPANY_BEST_MATCH', 'BENEFICIARY_CCIF_BEST_MATCH', 
+#                                      'BENEFICIARY_HIGHEST_RATIO', 'BENEFICIARY_UPDATE_TAG', df_cust_simple)
     
-    for ccc in df_ccc['ENTITIES'].values.tolist():
-        df1['APPLICANT_CCC'] = 
-        
-        df1['APPLICANT_CCC'].apply(lambda x: 
-                                          re.split(r'\b%s\b' % ccc, x)[0] + ccc if (re.search(r'\b%s\b' % ccc, x)) and \
-                                          (len(re.split(' ', re.split(r'\b%s\b' % ccc, x)[0] + ccc)) > 2)
-                                          else x)
-        df2['BENEFICIARY_CCC'] = df2['BENEFICIARY_CCC'].apply(lambda x: 
-                                          re.split(r'\b%s\b' % ccc, x)[0] + ccc if (re.search(r'\b%s\b' % ccc, x)) and \
-                                          (len(re.split(' ', re.split(r'\b%s\b' % ccc, x)[0] + ccc)) > 2) 
-                                          else x)
-        df_customers['CUST_NAME_CCC'] = df_customers['CUST_NAME_CCC'].apply(lambda x: 
-                                       re.split(r'\b%s\b' % ccc, x)[0] + ccc if (re.search(r'\b%s\b' % ccc, x)) and \
-                                       (len(re.split(' ', re.split(r'\b%s\b' % ccc, x)[0] + ccc)) > 2)
-                                       else x)
+    return df1_simple, df2_simple, df_cust_simple
     
-    
+def exact_match_modified_co(df, dseries, dseries_co, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
+    # Drop all duplicates 
+    # Note: GDWH duplicates have been treated in parse_table_data()
+    df.drop_duplicates(dseries, inplace = True)
+    # Create additional column in df to store simple fuzzy matches
+    df[dseries_co] = df[dseries]
+    # Create df_cust using df_customers
+    df_cust = df_customers.copy()
+    # Remove redundant columns
+    del df_cust['CUST_NAME'], df_cust['CUST_NAME_NEW'], df_cust['CUST_NAME_CCC']
+    # Reorder/Rename remaining columns
+    df_cust = df_cust[['CUST_NAME_CO', 'C_CIF_NO']]
+    df_cust.columns = [dseries_co, dseries_ccif]
+    # Perform left join
+    df = pd.merge(df, df_cust, how = 'left', on = dseries_co)
+    df.dropna(subset = [dseries_ccif], inplace = True)
+    df[dseries_ratio] = 0.997
+    df[dseries_tag] = 'Y'
+    return df
 
+def exact_match_original(df, dseries, dseries_co, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
+    # Drop all duplicates 
+    # Note: GDWH duplicates have been treated in parse_table_data()
+    df.drop_duplicates(dseries, inplace = True)
+    # Create additional column in df to store simple fuzzy matches
+    df[dseries_co] = df[dseries]
+    # Create df_cust using df_customers
+    df_cust = df_customers.copy()
+    # Remove redundant columns
+    del df_cust['CUST_NAME_NEW'], df_cust['CUST_NAME_CCC'], df_cust['CUST_NAME_CO']
+    # Reorder/Rename remaining columns
+    df_cust.columns = [dseries_co, dseries_ccif]
+    # Perform left join
+    df = pd.merge(df, df_cust, how = 'left', on = dseries_co)
+    df.dropna(subset = [dseries_ccif], inplace = True)
+    df[dseries_ratio] = 1
+    df[dseries_tag] = 'Y'
+    return df
 
-#    
-    return df1, df2, df_customers, df_ccc
-
-
-## Fuzzy matching
-def get_all_trics_data(table):
+## Complicated Fuzzy matching
+def get_all_trics_data(table):   
     # Drop duplicates and UPDATE_FLAG = N in df_remit_match
     df_remit_match = LevRatioRemit(df1, df_customers, ratio)
     df_remit_match.drop_duplicates('APPLICANT', inplace = True)
@@ -250,6 +329,8 @@ def LevRatioBen(df1, df2, fun):
     
     return df_ben_match
 
+
+    
 def get_closest_match(sample_string, df, fun):
     # Initialize variables
     best_match = ''
@@ -295,11 +376,14 @@ def get_closest_match(sample_string, df, fun):
                     
     return best_match, highest_ratio
 
+############################################### END #################################################################  
+    
 
 ## Execute conditions
-conn, cursor = start_mySQL()
-mySQLtables = return_DB('trics_lc_worldwide')
-df_, df_gdwh = return_table_data(mySQLtables[-2])
-df1, df2, df_customers = parse_table_data()
-#df1, df2, df_customers, df_ccc = parse_table_data()
+#conn, cursor = start_mySQL()
+#mySQLtables = return_DB('trics_lc_worldwide')
+#df_, df_gdwh = return_table_data(mySQLtables[-2])
+#df1, df2, df_customers = parse_table_data()
+#df1_simple, df2_simple = simple_fuzzy_match()
+df1_simple, df2_simple, df_cust_simple = simple_fuzzy_match()
 #df_trics_mod = get_all_trics_data(mySQLtables[-2])  
