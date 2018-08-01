@@ -28,3 +28,4 @@ del a['SHORT'], a['LONG']
 #a['Company_new'] = a.dropna(subset = ['SHORT'])['Company'].str.split(r'\b%s\b' % '(' + "|".join(a['SHORT'].dropna()) + ')').str[0] + a['LONG'].dropna()
 #a['Company'] = a.dropna().apply(lambda x: x['Company'].replace(x['SHORT'],x['LONG']), axis=1)
 
+#edit the abu dhabi
