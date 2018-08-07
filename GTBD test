@@ -5,19 +5,20 @@ for string in b.values.tolist():
     a['Company'] = [re.sub(r'\b%s\b' % string[1], string[0], company) for company in a['Company']]
 
 def LevRatio(df1, df2, fun):
-    # Drop all dupkucates in df1
+    # Drop all duplicates in df1
     df1.drop_duplicates(TRICS_combined_columns[0], inplace = True)
     # Initialize df2
     df_match = pd.DataFrame({'TRICS_COMPANY': [], 'GDWH_COMPANY': [], 'RATIO': []})
     df_match['GDWH_COMPANY'] = df2[GDWH_combined_columns[3]]
     for row in df1.itertuples():
         df_match['TRICS_COMPANY'] = np.tile(row[2], (len(df2),1)) 
-        df_match['RATIO'] = df_match['RATIO'].apply(lambda x: get_closest_match(x['TRICS_COMPANY'], x['GDWH_COMPANY'], fun))
+        df_match['RATIO'] = df_match['RATIO'].apply(lambda x: get_closest_match(x['TRICS_COMPANY'], x['GDWH_COMPANY'], fun), axis = 1)
+        df_match['GDWH_COMPANY'][df_match['RATIO'] == max(df_match['RATIO'])] 
+        # create temp dataframe and include conditions during matching if necessary
         
 def get_closest_match(sample_string, current_string, fun):
     # Initialize variables
-    best_match = ''
-    highest_ratio = 0
+    current_score = 0
     # Compare sample_string with current_string in actual customer list
     if (sample_string.split(' ')[0:2] == current_string.split(' ')[0:2]) and \
         ([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string] \
@@ -26,14 +27,10 @@ def get_closest_match(sample_string, current_string, fun):
          len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string]) >= 1:
         # If it is not total match but pass first word/country matching, proceed with fuzzy matching 
             current_score = fun(sample_string, current_string)
-            if(current_score > highest_ratio):
-                highest_ratio = current_score
                     
     elif (sample_string.split()[0:2] == current_string.split()[0:2]) and \
         len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string]) == 0 and \
         len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string]) == 0:
         # If it is not total match and fail all other conditions above, proceed with fuzzy matching 
-        current_score = fun(sample_string, current_string)
-        if(current_score > highest_ratio):
-            highest_ratio = current_score             
-    return highest_ratio
+        current_score = fun(sample_string, current_string)            
+    return current_score
