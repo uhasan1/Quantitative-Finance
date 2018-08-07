@@ -4,29 +4,36 @@ b = pd.DataFrame({'LONG': ['CORPORATION', 'COMPANY'], 'SHORT': ['CO LTD', 'CO']}
 for string in b.values.tolist():
     a['Company'] = [re.sub(r'\b%s\b' % string[1], string[0], company) for company in a['Company']]
 
-# print(df.tail()) to inspect the entries
-# https://engineering.upside.com/a-beginners-guide-to-optimizing-pandas-code-for-speed-c09ef2c6a4d6
-# https://maxpowerwastaken.github.io/blog/pandas-dont-apply-_-vectorize/
-
-
-# to remove any spaces for the checks: sample_string[7].replace(' ', '')
-# replace iterable with .str.replace: df_trics_remit['REMITTER_ENGLISH_NEW'] = [re.sub(r'\b%s\b' % 'AND', '', row) for row in df_trics_remit['REMITTER_ENGLISH_NEW']]
-
-a = pd.DataFrame({'Company': ['ABC PL', 'DEF CO LTD', 'XYZ INC']})
-b = pd.DataFrame({'SHORT': ['CO LTD', 'INC'], 'LONG': ['COMPANY LIMITED', 'INCORPORATED']})
-pattern = "|".join(b['SHORT'])
-a['Company'].str.replace('(' + pattern + ')', 'sigh')
-a['Company'].str.replace('(' + pattern + ')', '').str.strip()
-a['SHORT'] = a['Company'].str.extract(r'\b%s\b' % '(' + pattern + ')', expand = False)
-a['SHORT'].fillna(a['Company'][a['SHORT'].isnull()], inplace = True)
-a = pd.merge(a, b, how = 'left', on = 'SHORT')
-a['Company'] = a.dropna(subset = ['LONG'])['Company'].str.replace(r'\b%s\b' % '(' + "|".join(a['SHORT'].dropna()) + ')', '') + a['LONG'].dropna()
-a['Company'].fillna(a['SHORT'][a['Company'].isnull()], inplace = True)
-del a['SHORT'], a['LONG']
-
-## Alternatives:
-#a['Company_new'] = a.dropna(subset = ['SHORT'])['Company'].str.split(r'\b%s\b' % '(' + "|".join(a['SHORT'].dropna()) + ')').str[0] + a['LONG'].dropna()
-#a['Company'] = a.dropna().apply(lambda x: x['Company'].replace(x['SHORT'],x['LONG']), axis=1)
-
-#edit the abu dhabi
-df['TEMP_CCC'] = df['TEMP_CCC'][(df['TEMP_CCC_NO1'] != df['TEMP_CCC']) & (df['TEMP_CCC_NO2'] != df['TEMP_CCC']) & (df['TEMP_CCC_NO1'] + df['TEMP_CCC_NO2'] != df['TEMP_CCC'])]
+def LevRatio(df1, df2, fun):
+    # Drop all dupkucates in df1
+    df1.drop_duplicates(TRICS_combined_columns[0], inplace = True)
+    # Initialize df2
+    df_match = pd.DataFrame({'TRICS_COMPANY': [], 'GDWH_COMPANY': [], 'RATIO': []})
+    df_match['GDWH_COMPANY'] = df2[GDWH_combined_columns[3]]
+    for row in df1.itertuples():
+        df_match['TRICS_COMPANY'] = np.tile(row[2], (len(df2),1)) 
+        df_match['RATIO'] = df_match['RATIO'].apply(lambda x: get_closest_match(x['TRICS_COMPANY'], x['GDWH_COMPANY'], fun))
+        
+def get_closest_match(sample_string, current_string, fun):
+    # Initialize variables
+    best_match = ''
+    highest_ratio = 0
+    # Compare sample_string with current_string in actual customer list
+    if (sample_string.split(' ')[0:2] == current_string.split(' ')[0:2]) and \
+        ([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string] \
+         == [ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string]) and \
+         len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string]) >= 1 and \
+         len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string]) >= 1:
+        # If it is not total match but pass first word/country matching, proceed with fuzzy matching 
+            current_score = fun(sample_string, current_string)
+            if(current_score > highest_ratio):
+                highest_ratio = current_score
+                    
+    elif (sample_string.split()[0:2] == current_string.split()[0:2]) and \
+        len([ccc for ccc in df_ccc['ENTITIES'] if ccc in sample_string]) == 0 and \
+        len([ccc for ccc in df_ccc['ENTITIES'] if ccc in current_string]) == 0:
+        # If it is not total match and fail all other conditions above, proceed with fuzzy matching 
+        current_score = fun(sample_string, current_string)
+        if(current_score > highest_ratio):
+            highest_ratio = current_score             
+    return highest_ratio
