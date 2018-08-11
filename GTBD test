@@ -34,3 +34,6 @@ def get_closest_match(sample_string, current_string, fun):
         # If it is not total match and fail all other conditions above, proceed with fuzzy matching 
         current_score = fun(sample_string, current_string)            
     return current_score
+
+import datetime
+datetime.datetime.now().strftime("%Y%m%d")
