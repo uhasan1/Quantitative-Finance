@@ -10,7 +10,7 @@ def LevRatio(df1, df2, fun):
         df_match['GDWH_COMPANY'][df_match['RATIO'] == max(df_match['RATIO'])] 
         # create temp dataframe and include conditions during matching if necessary
 
-import datetime
+import datetime ## SHIFT TO TOP OF PYTHON LIBRARIES
 datetime.datetime.now().strftime("%Y%m%d")
 
 # Initialize DataFrame for complex fuzzy matching
@@ -18,8 +18,8 @@ datetime.datetime.now().strftime("%Y%m%d")
     df_match = pd.DataFrame({'TRICS_COMPANY_CO': [], 'GDWH_COMPANY_CO': [], 'GDWH_COMPANY': [], 'GDWH_CCIF': [], 'RATIO': []})
     # Start complex fuzzy matching
     for row in df_fuzzy_match.itertuples():
-        orig_company_match = df_customers[GDWH_combined_columns[0]][df_customers[GDWH_combined_columns[3]].str.replace(' ', '').str.find(''.join(row[2].split()[0:2])) >= 0].tolist()
-        rev_company_match = df_customers[GDWH_combined_columns[3]][df_customers[GDWH_combined_columns[3]].str.replace(' ', '').str.find(''.join(row[2].split()[0:2])) >= 0].tolist()
+        orig_company_match = df_customers[GDWH_combined_columns[0]][df_customers[GDWH_combined_columns[3]].str.replace(' ', '').str.find(r'\b%s\b' % ''.join(row[2].split()[0:2])) >= 0].tolist()
+        rev_company_match = df_customers[GDWH_combined_columns[3]][df_customers[GDWH_combined_columns[3]].str.replace(' ', '').str.find(r'\b%s\b' % ''.join(row[2].split()[0:2])) >= 0].tolist()
         orig_ccif_match = df_customers[GDWH_columns[1]][df_customers[GDWH_combined_columns[3]].str.replace(' ', '').str.find(''.join(row[2].split()[0:2])) >= 0].tolist()
         if len(orig_company_match) != 0:
             df_match['GDWH_COMPANY_CO'] = rev_company_match
