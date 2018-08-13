@@ -37,6 +37,10 @@ datetime.datetime.now().strftime("%Y%m%d")
         if count % 1000 == 0:
             print('Progress: %d out of %d' % (count, len(df_fuzzy_match)))
         #### CHECK TIME AND REPLACE THOSE NULL VALUES in N ####
+            df_fuzzy_match['COMPANY_BEST_MATCH'][df_fuzzy_match[TRICS_combined_columns[3]] == row[2]] = ''
+            df_fuzzy_match['CCIF_BEST_MATCH'][df_fuzzy_match[TRICS_combined_columns[3]] == row[2]] = ''
+            df_fuzzy_match['HIGHEST_RATIO'][df_fuzzy_match[TRICS_combined_columns[3]] == row[2]] = 0
+            df_fuzzy_match['UPDATE_TAG'][df_fuzzy_match[TRICS_combined_columns[3]] == row[2]] = 'N'
     print('Complex fuzzy matching completed!')   
     
     def get_closest_match(sample_string, current_string, fun):
