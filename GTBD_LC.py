@@ -5,7 +5,7 @@ import datetime
 from Levenshtein import *
 import numpy as np
 import pandas as pd
-import pandas.io.sql as psql
+import pandas.io.sql as psqllol
 import pyodbc
 import time
 
@@ -19,7 +19,7 @@ GDWH_combined_columns = ['CUST_NAME', 'CUST_NAME_NEW', 'CUST_NAME_CCC', 'CUST_NA
 
 ## Establish connection to mySQL server
 def start_mySQL():
-    conn = pyodbc.connect(r'DRIVER={MySQL ODBC 5.3 Unicode Driver};'
+    conn = pyodbc.connect(r'DRIVER={MySQL ODBC 5.3 UNICODE Driver};'
                             r'SERVER=localhost;'
                             r'PORT=3306;'
                             r'DATABASE=gtbd;'
@@ -111,7 +111,7 @@ def parse_table_data(TRICS_columns, TRICS_cust_columns, TRICS_combined_columns, 
     df_combined = remove_abb('CompanyAbbRemove.xlsx', df_combined, TRICS_combined_columns[1])
     df_customers = remove_abb('CompanyAbbRemove.xlsx', df_customers, GDWH_combined_columns[1])
  
-    # Create a new column to store RM/LC data
+    # Create a new column to store RM data
     df_combined[TRICS_combined_columns[2]] = df_combined[TRICS_combined_columns[1]]
     df_customers[GDWH_combined_columns[2]] = df_customers[GDWH_combined_columns[1]]
     df_combined[TRICS_combined_columns[3]] = df_combined[TRICS_combined_columns[1]]
@@ -299,11 +299,11 @@ def total_match():
     # Print status
     print('Exact matching completed!')
     # Download exact matching results
-    df_exact_match.to_excel(r'Y:\MRDD_Temp\%s_RM_ExactMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+    df_exact_match.to_excel(r'Y:\MRDD_Temp\%s_LC_ExactMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
     
     # Initialize counter for complex fuzzy matching
     count = 0
-    # Query the first 2 words for all TRICS company names in df_fuzzy_match
+    # Query GDWH rows that have first 2 identical words as df_fuzzy_match
     df_fuzzy_match['TEMP'] = df_fuzzy_match['COMBINED_CUST_CO'].str.split().str[0:2].str.join(' ') #+ ' ' + df_fuzzy_match['COUNTRY']
     # Create a copy of df_customers
     df_cust = df_customers.copy()
@@ -368,7 +368,7 @@ def total_match():
     # Remove redundant columns from df_fuzzy_match
     del df_fuzzy_match[TRICS_combined_columns[3]]
     # Download fuzzy matching results
-    df_fuzzy_match.to_excel(r'Y:\MRDD_Temp\%s_RM_FuzzyMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+    df_fuzzy_match.to_excel(r'Y:\MRDD_Temp\%s_LC_FuzzyMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
     return df_exact_match, df_fuzzy_match
 
 def exact_match_modified_ccc(df, dseries, dseries_co, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
@@ -559,17 +559,18 @@ def consol():
     # Update starting index from 0 to 1  
     df_main.index = np.arange(1,len(df_main)+1)
     return df_main
-    
+       
 
 # Execute conditions
 start_time = time.time()
 conn, cursor = start_mySQL()
-TRICS_columns = ['COUNTRY_FROM_2', 'COUNTRY_TO_2', 'REMITTING_BANK_JP_BANK_GRP_2', 'BENEFICIARY_BANK_JP_BANK_GRP_2', 
-                'REMITTER_ENGLISH', 'REMITTER_C_CIF', 'BENEFICIARY_ENGLISH', 'BENEFICIARY_C_CIF']
-TRICS_cust_columns = ['REMITTER_ENGLISH', 'BENEFICIARY_ENGLISH']
-df_1, df_gdwh = return_table_data(TRICS_columns, 'trics_rm_worldwide_updated', 1000, 0, GDWH_columns) # Update filename accordingly
-df_2, df_gdwh = return_table_data(TRICS_columns, 'trics_rm_worldwide_201807', 1000, 0, GDWH_columns) # Update filename accordingly
-df_ = df_1.append(df_2, ignore_index = True) # Combine all files
+TRICS_columns = ['COUNTRY_FROM', 'COUNTRY_TO', 'ISSUING_BANK_JP_BANK_GRP', 'ADVISING_BANK_JP_BANK_GRP', 
+                'APPLICANT', 'APPLICANT_C_CIF', 'BENEFICIARY', 'BENEFICIARY_C_CIF']
+TRICS_cust_columns = ['APPLICANT', 'BENEFICIARY']
+df_1, df_gdwh = return_table_data(TRICS_columns, 'trics_lc_worldwide_all_fy2017', 1000, 0, GDWH_columns) # Update filename accordingly
+df_2, df_gdwh = return_table_data(TRICS_columns, 'trics_lc_worldwide_all_fy2018', 1000, 0, GDWH_columns) # Update filename accordingly
+df_3, df_gdwh = return_table_data(TRICS_columns, 'trics_lc_worldwide_201807', 1000, 0, GDWH_columns) # Update filename accordingly
+df_ = df_1.append([df_2, df_3], ignore_index = True) # Combine all files
 download_time = time.time() - start_time
 print ('The downloading of data took: %s seconds' % str(download_time))
 df_combined, df_customers = parse_table_data(TRICS_columns, TRICS_cust_columns, TRICS_combined_columns, GDWH_combined_columns)
@@ -579,4 +580,4 @@ df_exact_match, df_fuzzy_match = total_match()
 match_time = time.time() - start_time - download_time - parse_time
 print ('The matching of data took: %s seconds' % str(match_time))
 df_main = consol()
-df_main.to_excel(r'Y:\MRDD_Temp\%s_RM.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+df_main.to_excel(r'Y:\MRDD_Temp\%s_LC.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
