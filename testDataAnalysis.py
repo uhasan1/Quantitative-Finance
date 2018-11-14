@@ -67,3 +67,4 @@ HPI_corr = df_main.corr()
 
 ## Reference Visitors and/or Bounce_Rate columns
 #print(df[['Visitors','Bounce_Rate']])
+#http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/
