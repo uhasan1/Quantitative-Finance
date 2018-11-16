@@ -48,9 +48,20 @@ def return_table_data(TRICS_columns, TRICS_file, chunk_size, offset, GDWH_column
     # Convert GDWH_columns from list to string
     GDWH_column_list = ','.join(map(str, GDWH_columns))
     # Import GDWH customer list from mySQL server
-    df_gdwh = pd.read_sql('SELECT %s FROM gdwh_customer WHERE %s IS NOT NULL;' % (GDWH_column_list, GDWH_columns[0]), con = conn)
+    df_gdwh = pd.read_sql('SELECT %s FROM gtbd_custlist WHERE %s IS NOT NULL;' % (GDWH_column_list, GDWH_columns[0]), con = conn)
     return df_, df_gdwh
 
+
+## Run query to store ISO_COUNTRY_CODE in memory
+def return_iso_table():
+    iso_column_list = ','.join(map(str, ['TRICS', '`Mizuho Branch`']))
+    df_iso = pd.read_sql('SELECT %s FROM iso_country_code WHERE %s = 1;' % (iso_column_list, '`Mizuho Branch`'), con = conn)
+    # Change the word (1) 'VIET NAM' to 'VIETNAM', (2) 'KOREA, REPUBLIC OF' TO 'KOREA' in TRICS column
+    df_iso['TRICS'] = df_iso['TRICS'].str.replace('VIET NAM', 'VIETNAM') 
+    df_iso['TRICS'] = df_iso['TRICS'].str.replace('KOREA, REPUBLIC OF', 'KOREA')
+    # Rename columns
+    df_iso.rename(columns = {'TRICS': 'COUNTRY', 'Mizuho Branch': 'MIZUHO'}, inplace = True)
+    return df_iso
 
 ############################################### PARSE DATA: START ###############################################################
 
@@ -84,7 +95,7 @@ def parse_table_data(TRICS_columns, TRICS_cust_columns, TRICS_combined_columns, 
     df_customers.dropna(subset = [GDWH_columns[0], GDWH_columns[1]], inplace = True)
     df_customers.drop_duplicates(subset = [GDWH_columns[0], GDWH_columns[2]], inplace = True)
     # Drop all invalid customer names, e.g. DUMMY, DELETED, DORMANT etc.
-    drop_list = ['DUMMY', 'DELETED', 'DORMANT', 'ABOLISH', 'REQUIRED FOR LONDON', 'TO BE USED', 'DUPLICATE', 'ITRAXX', 'DO NOT USE']
+    drop_list = ['DUMMY', 'DELETED', 'DORMANT', 'ABOLISH', 'REQUIRED FOR LONDON', 'TO BE USED', 'DUPLICATE', 'ITRAXX', 'DO NOT USE', 'LIMITED A C', 'LIMITED PURPOSE']
     df_customers = df_customers[~df_customers[GDWH_columns[0]].str.contains('|'.join(drop_list))]
     # Re-adjust column order
     df_customers = df_customers[[GDWH_columns[2], GDWH_columns[1], GDWH_columns[0]]]
@@ -281,25 +292,29 @@ def total_match():
     df_exact_match['UPDATE_TAG'][df_exact_match['BEST_NEW_TAG'].notnull()] = df_exact_match[df_exact_match['BEST_NEW_TAG'].notnull()]['BEST_NEW_TAG']
     df_exact_match['UPDATE_TAG'][df_exact_match['BEST_ORIGIN_TAG'].notnull()] = df_exact_match[df_exact_match['BEST_ORIGIN_TAG'].notnull()]['BEST_ORIGIN_TAG']
     
+    # Perform join and change UPDATE_TAG to 'NO COUNTRY BRANCH' if Mizuho does not have a branch in specific country 
+    df_exact_match = pd.merge(df_exact_match, df_iso, how = 'left', on = 'COUNTRY')
+    df_exact_match['UPDATE_TAG'][df_exact_match['MIZUHO'].isnull()] = 'NO COUNTRY BRANCH'
+    
     # Remove redundant columns
-    del df_exact_match[TRICS_combined_columns[1]], df_exact_match[TRICS_combined_columns[2]]
+    del df_exact_match[TRICS_combined_columns[1]], df_exact_match[TRICS_combined_columns[2]], df_exact_match['MIZUHO']
     del df_exact_match['BEST_CCC'], df_exact_match['BEST_CO'], df_exact_match['BEST_NEW'], df_exact_match['BEST_ORIGIN']
     del df_exact_match['BEST_CCC_CCIF'], df_exact_match['BEST_CO_CCIF'], df_exact_match['BEST_NEW_CCIF'], df_exact_match['BEST_ORIGIN_CCIF']
     del df_exact_match['BEST_CCC_RATIO'], df_exact_match['BEST_CO_RATIO'], df_exact_match['BEST_NEW_RATIO'], df_exact_match['BEST_ORIGIN_RATIO']
     del df_exact_match['BEST_CCC_TAG'], df_exact_match['BEST_CO_TAG'], df_exact_match['BEST_NEW_TAG'], df_exact_match['BEST_ORIGIN_TAG']
     
     # Query out the list of NaN cases in df_exact_match for complex fuzzy matching
-    df_fuzzy_match = df_exact_match[df_exact_match['HIGHEST_RATIO'].isnull()]  
+    df_fuzzy_match = df_exact_match[(df_exact_match['HIGHEST_RATIO'].isnull()) & (df_exact_match['UPDATE_TAG'].isnull())]  
     # Drop all duplicates in df_fuzzy_match
     df_fuzzy_match.drop_duplicates(subset = [TRICS_combined_columns[0], 'COUNTRY'], inplace = True)
     # Remove remaining redundant columns from df_exact_match
     df_exact_match.drop_duplicates(subset = [TRICS_combined_columns[0], 'COUNTRY'], inplace = True)
     del df_exact_match[TRICS_combined_columns[3]]
-    df_exact_match = df_exact_match[df_exact_match['HIGHEST_RATIO'].notnull()]
+    df_exact_match = df_exact_match[df_exact_match['UPDATE_TAG'].notnull()]
     # Print status
     print('Exact matching completed!')
-    # Download exact matching results
-    df_exact_match.to_excel(r'Y:\MRDD_Temp\%s_RM_ExactMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+#    # Download exact matching results
+#    df_exact_match.to_excel(r'Y:\MRDD_Temp\%s_RM_ExactMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
     
     # Initialize counter for complex fuzzy matching
     count = 0
@@ -357,8 +372,12 @@ def total_match():
     df_fuzzy_match['COMPANY_BEST_MATCH'].fillna('', inplace = True)
     df_fuzzy_match['CCIF_BEST_MATCH'].fillna('', inplace = True)
     df_fuzzy_match['HIGHEST_RATIO'].fillna(0, inplace = True)
-    # Assign UPDATE_TAG as 'Y' if HIGHEST_RATIO >= 0.95 and 'N' otherwise     
-    df_fuzzy_match['UPDATE_TAG'][df_fuzzy_match['HIGHEST_RATIO'] >= 0.95] = 'Y'
+    # Assign UPDATE_TAG if it HIGHEST_RATIO meets the following criterion:
+    # (1) 'EXACT NAME' if HIGHEST_RATIO is 0.99 and above
+    # (2) 'SIMILAR NAME' if HIGHEST_RATIO is between 0 and 0.99 (both numbers are exclusive)
+    # (3) 'N' if otherwise 
+    df_fuzzy_match['UPDATE_TAG'][df_fuzzy_match['HIGHEST_RATIO'] >= 0.99] = 'EXACT NAME'
+    df_fuzzy_match['UPDATE_TAG'][(df_fuzzy_match['HIGHEST_RATIO'] > 0) & (df_fuzzy_match['HIGHEST_RATIO'] < 0.99)] = 'SIMILAR NAME'
     df_fuzzy_match['UPDATE_TAG'].fillna('N', inplace = True)
     # Reformat the CCIF_BEST_MATCH and HIGHEST RATIO fields 
     df_fuzzy_match['CCIF_BEST_MATCH'] = df_fuzzy_match['CCIF_BEST_MATCH'].astype(str)
@@ -367,8 +386,8 @@ def total_match():
     print('Complex fuzzy matching completed!')
     # Remove redundant columns from df_fuzzy_match
     del df_fuzzy_match[TRICS_combined_columns[3]]
-    # Download fuzzy matching results
-    df_fuzzy_match.to_excel(r'Y:\MRDD_Temp\%s_RM_FuzzyMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+#    # Download fuzzy matching results
+#    df_fuzzy_match.to_excel(r'Y:\MRDD_Temp\%s_RM_FuzzyMatch.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
     return df_exact_match, df_fuzzy_match
 
 def exact_match_modified_ccc(df, dseries, dseries_co, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
@@ -384,28 +403,36 @@ def exact_match_modified_ccc(df, dseries, dseries_co, dseries_ccif, dseries_rati
     # Reorder/Rename remaining columns
     df_cust = df_cust[[GDWH_combined_columns[2], GDWH_combined_columns[0], GDWH_columns[1], GDWH_columns[2]]]
     df_cust.columns = [dseries, dseries_co, dseries_ccif, GDWH_columns[2]]
-    # Perform join
+    # Create df_match copy using df_cust
     df_match = df_cust.copy()
 #    df_match = df_cust.loc[df_cust[dseries].str.replace(' ', '').isin(df[dseries].str.replace(' ', '')), [dseries, dseries_co, dseries_ccif]]
+    # Remove common company abbreviations from company name in df_match
     df_match['TEMP'] = df_match[dseries].str.split(r'\b%s\b' % 'COMPANY LIMITED').str[0]
     df_match['TEMP'] = df_match['TEMP'].str.split(r'\b%s\b' % 'LIMITED').str[0]
     df_match['TEMP'] = df_match['TEMP'].str.split(r'\b%s\b' % 'INCORPORATED').str[0]
+     # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df_match['TEMP'] = df_match['TEMP'] + ' ' + df_match['COUNTRY']
+    # Remove any country duplicates if present in company name string
     df_match['TEMP'] = df_match['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df_match['TEMP'] = df_match['TEMP'].str.replace(' ', '')
     del df_match[dseries], df_match['COUNTRY']
+    # Remove common company abbreviations from company name in df
     df['TEMP'] = df[dseries].str.split(r'\b%s\b' % 'COMPANY LIMITED').str[0]
     df['TEMP'] = df['TEMP'].str.split(r'\b%s\b' % 'LIMITED').str[0]
     df['TEMP'] = df['TEMP'].str.split(r'\b%s\b' % 'INCORPORATED').str[0]
+    # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df['TEMP'] = df['TEMP'] + ' ' + df['COUNTRY']
+    df.dropna(subset = ['TEMP'], inplace = True)
+    # Remove any country duplicates if present in company name string
     df['TEMP'] = df['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df['TEMP'] = df['TEMP'].str.replace(' ', '')
+    # Perform join
     df = pd.merge(df, df_match, how = 'left', on = 'TEMP')
     # Remove redundant columns
     del df['TEMP']
     # Update ratio and tag for matching records
     df[dseries_ratio] = df.dropna(subset = [dseries_ccif])[dseries_ratio].str.replace('', '0.997')
-    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'Y') 
+    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'EXACT NAME') 
     return df
 
 def exact_match_modified_co(df, dseries, dseries_co, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
@@ -421,21 +448,25 @@ def exact_match_modified_co(df, dseries, dseries_co, dseries_ccif, dseries_ratio
     # Reorder/Rename remaining columns
     df_cust = df_cust[[GDWH_combined_columns[3], GDWH_combined_columns[0], GDWH_columns[1], GDWH_columns[2]]]
     df_cust.columns = [dseries, dseries_co, dseries_ccif, GDWH_columns[2]]
-    # Perform join
     df_match = df_cust.loc[df_cust[dseries].str.replace(' ', '').isin(df[dseries].str.replace(' ', '')), [dseries, dseries_co, dseries_ccif, GDWH_columns[2]]]
+    # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df_match['TEMP'] = df_match[dseries] + ' ' + df_match['COUNTRY']
+    # Remove any country duplicates if present in company name string
     df_match['TEMP'] = df_match['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df_match['TEMP'] = df_match['TEMP'].str.replace(' ', '')
     del df_match[dseries], df_match['COUNTRY']
+    # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df['TEMP'] = df[dseries] + ' ' + df['COUNTRY']
+    # Remove any country duplicates if present in company name string
     df['TEMP'] = df['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df['TEMP'] = df['TEMP'].str.replace(' ', '')
+    # Perform join
     df = pd.merge(df, df_match, how = 'left', on = 'TEMP')
     # Remove redundant columns
     del df['TEMP']
     # Update ratio and tag for matching records
     df[dseries_ratio] = df.dropna(subset = [dseries_ccif])[dseries_ratio].str.replace('', '0.998')
-    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'Y') 
+    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'EXACT NAME') 
     return df
 
 def exact_match_modified_new(df, dseries, dseries_co, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
@@ -451,21 +482,25 @@ def exact_match_modified_new(df, dseries, dseries_co, dseries_ccif, dseries_rati
     # Reorder/Rename remaining columns
     df_cust = df_cust[[GDWH_combined_columns[1], GDWH_combined_columns[0], GDWH_columns[1], GDWH_columns[2]]]
     df_cust.columns = [dseries, dseries_co, dseries_ccif, GDWH_columns[2]]
-    # Perform join
     df_match = df_cust.loc[df_cust[dseries].str.replace(' ', '').isin(df[dseries].str.replace(' ', '')), [dseries, dseries_co, dseries_ccif, GDWH_columns[2]]]
+    # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df_match['TEMP'] = df_match[dseries] + ' ' + df_match['COUNTRY']
+    # Remove any country duplicates if present in company name string
     df_match['TEMP'] = df_match['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df_match['TEMP'] = df_match['TEMP'].str.replace(' ', '')
     del df_match[dseries], df_match['COUNTRY']
+    # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df['TEMP'] = df[dseries] + ' ' + df['COUNTRY']
+    # Remove any country duplicates if present in company name string
     df['TEMP'] = df['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df['TEMP'] = df['TEMP'].str.replace(' ', '')
+    # Perform join
     df = pd.merge(df, df_match, how = 'left', on = 'TEMP')
     # Remove redundant columns
     del df['TEMP']
     # Update ratio and tag for matching records
     df[dseries_ratio] = df.dropna(subset = [dseries_ccif])[dseries_ratio].str.replace('', '0.999')
-    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'Y') 
+    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'EXACT NAME') 
     return df
 
 def exact_match_original(df, dseries, dseries_ccif, dseries_ratio, dseries_tag, df_cust):
@@ -484,7 +519,9 @@ def exact_match_original(df, dseries, dseries_ccif, dseries_ratio, dseries_tag, 
     del df_cust[GDWH_combined_columns[1]], df_cust[GDWH_combined_columns[2]], df_cust[GDWH_combined_columns[3]]
     # Reorder/Rename remaining columns
     df_cust = df_cust[[GDWH_combined_columns[0], GDWH_columns[1], GDWH_columns[2]]]
+    # Create a string with remaining company name and country details for standardization between TRICS and GDWH
     df_cust['TEMP'] = df_cust[GDWH_combined_columns[0]] + ' ' + df_cust[GDWH_columns[2]]
+    # Remove any country duplicates if present in company name string
     df_cust['TEMP'] = df_cust['TEMP'].apply(lambda x: ' '.join(sorted(set(x.split()[::-1]), key=x.split()[::-1].index)[::-1]))
     df_cust['TEMP'] = df_cust['TEMP'].str.replace(r'[^\w\s]', '')
     df_cust['TEMP'] = df_cust['TEMP'].str.replace(' ', '')
@@ -495,7 +532,7 @@ def exact_match_original(df, dseries, dseries_ccif, dseries_ratio, dseries_tag, 
     df = pd.merge(df, df_cust, how = 'left', on = 'TEMP')
     # Update ratio and tag for matching records
     df[dseries_ratio] = df.dropna(subset = [dseries_ccif])[dseries_ratio].str.replace('', '1')
-    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'Y') 
+    df[dseries_tag] = df.dropna(subset = [dseries_ccif])[dseries_tag].str.replace('', 'EXACT NAME') 
     # Remove redundant columns
     del df['TEMP']
     return df
@@ -510,7 +547,9 @@ def get_closest_match(sample_string, sample_country, current_string, current_cou
 ############################################### FUZZY MATCH: END #################################################################  
 
 
-# Consolidate results from all DataFrames
+############################################# PRESENT RESULTS: START ############################################################# 
+    
+## Consolidate results from all DataFrames
 def consol():
     # Create df_main containing RM details using df_
     df_main = df_.copy()
@@ -552,31 +591,111 @@ def consol():
     df_main['PYTHON_B_HIGHEST_RATIO'] = df_main['PYTHON_B_HIGHEST_RATIO'].str.replace('0.0', '0')
     df_main['PYTHON_B_HIGHEST_RATIO'] = df_main['PYTHON_B_HIGHEST_RATIO'].str.replace('1.0', '1')
     # Rearrange all the columns in df_main for readability
-    df_main = df_main[[TRICS_columns[0], TRICS_columns[1], TRICS_columns[2], TRICS_columns[3], TRICS_columns[4], TRICS_columns[5],
+    df_main = df_main[[TRICS_nayose_columns[0], TRICS_nayose_columns[1], TRICS_columns[0], TRICS_columns[1], TRICS_columns[2], TRICS_columns[3], TRICS_columns[4], TRICS_columns[5], TRICS_nayose_columns[-2],
                         'PYTHON_COMPANY_A_BEST_MATCH', 'PYTHON_CCIF_A_BEST_MATCH', 'PYTHON_A_HIGHEST_RATIO', 'PYTHON_A_UPDATE_TAG',
-                        TRICS_columns[6], TRICS_columns[7],
+                        TRICS_columns[6], TRICS_columns[7], TRICS_nayose_columns[-1],
                         'PYTHON_COMPANY_B_BEST_MATCH', 'PYTHON_CCIF_B_BEST_MATCH', 'PYTHON_B_HIGHEST_RATIO', 'PYTHON_B_UPDATE_TAG']]
     # Update starting index from 0 to 1  
-    df_main.index = np.arange(1,len(df_main)+1)
-    return df_main
+    df_main.index = np.arange(1, len(df_main) + 1)
+    
+    # Present results separately based on REMITTER/APPLICANT and BENEFICIARY
+    # Create df_main_1 containing RM Remitter details using df_main
+    df_main_1 = df_main.copy()
+    # Remove redundant columns
+    del df_main_1[TRICS_columns[3]], df_main_1[TRICS_columns[6]], df_main_1[TRICS_columns[7]], df_main_1[TRICS_nayose_columns[-1]]
+    del df_main_1['PYTHON_COMPANY_B_BEST_MATCH'], df_main_1['PYTHON_CCIF_B_BEST_MATCH'], df_main_1['PYTHON_B_HIGHEST_RATIO'], df_main_1['PYTHON_B_UPDATE_TAG']
+    # Change UPDATE_TAG if it meets the following criterion: 
+    # (1) 'TO INVESTIGATE' if ISSUING BANK is MIZUHO
+    # (2) 'FUTURE CUSTOMER TARGETING' if ISSUING BANK is not MIZUHO  
+    df_main_1['PYTHON_A_UPDATE_TAG'][(df_main_1[TRICS_columns[2]] == 'MIZUHO') & (df_main_1['PYTHON_A_HIGHEST_RATIO'] == '0') & (df_main_1['PYTHON_A_UPDATE_TAG'] == 'N')] = 'TO INVESTIGATE'
+    df_main_1['PYTHON_A_UPDATE_TAG'][(df_main_1[TRICS_columns[2]] != 'MIZUHO') & (df_main_1['PYTHON_A_HIGHEST_RATIO'] == '0') & (df_main_1['PYTHON_A_UPDATE_TAG'] == 'N')] = 'FUTURE CUSTOMER TARGETING'
+    # Modify ratio data type and sort them in descending order
+    df_main_1['PYTHON_A_HIGHEST_RATIO'] = df_main_1['PYTHON_A_HIGHEST_RATIO'].astype(float)
+    df_main_1.sort_values(by = 'PYTHON_A_HIGHEST_RATIO', ascending = False, inplace = True)
+    # Drop duplicates
+    df_main_1.drop_duplicates(subset = [TRICS_columns[0], TRICS_columns[1], TRICS_columns[4]], inplace = True)
+    # Update starting index from 0 to 1  
+    df_main_1.index = np.arange(1, len(df_main_1) + 1)
+    
+    # Create df_main_2 containing RM Beneficiary details using df_main
+    df_main_2 = df_main.copy()
+    # Remove redundant columns
+    del df_main_2[TRICS_columns[2]], df_main_2[TRICS_columns[4]], df_main_2[TRICS_columns[5]], df_main_2[TRICS_nayose_columns[-2]]
+    del df_main_2['PYTHON_COMPANY_A_BEST_MATCH'], df_main_2['PYTHON_CCIF_A_BEST_MATCH'], df_main_2['PYTHON_A_HIGHEST_RATIO'], df_main_2['PYTHON_A_UPDATE_TAG']
+    # Change UPDATE_TAG if it meets the following criterion: 
+    # (1) 'TO INVESTIGATE' if ADVISING BANK is MIZUHO
+    # (2) 'FUTURE CUSTOMER TARGETING' if ADVISING BANK is not MIZUHO  
+    df_main_2['PYTHON_B_UPDATE_TAG'][(df_main_2[TRICS_columns[3]] == 'MIZUHO') & (df_main_2['PYTHON_B_HIGHEST_RATIO'] == '0') & (df_main_2['PYTHON_B_UPDATE_TAG'] == 'N')] = 'TO INVESTIGATE'
+    df_main_2['PYTHON_B_UPDATE_TAG'][(df_main_2[TRICS_columns[3]] != 'MIZUHO') & (df_main_2['PYTHON_B_HIGHEST_RATIO'] == '0') & (df_main_2['PYTHON_B_UPDATE_TAG'] == 'N')] = 'FUTURE CUSTOMER TARGETING'
+    # Modify ratio data type and sort them in descending order
+    df_main_2['PYTHON_B_HIGHEST_RATIO'] = df_main_2['PYTHON_B_HIGHEST_RATIO'].astype(float)
+    df_main_2.sort_values(by = 'PYTHON_B_HIGHEST_RATIO', ascending = False, inplace = True)
+    # Drop duplicates
+    df_main_2.drop_duplicates(subset = [TRICS_columns[0], TRICS_columns[1], TRICS_columns[6]], inplace = True)
+    # Update starting index from 0 to 1  
+    df_main_2.index = np.arange(1, len(df_main_2) + 1)
+    return df_main, df_main_1, df_main_2
+
+############################################## PRESENT RESULTS: END #############################################################     
     
 
-# Execute conditions
+## Execute conditions
 start_time = time.time()
 conn, cursor = start_mySQL()
 TRICS_columns = ['COUNTRY_FROM_2', 'COUNTRY_TO_2', 'REMITTING_BANK_JP_BANK_GRP_2', 'BENEFICIARY_BANK_JP_BANK_GRP_2', 
                 'REMITTER_ENGLISH', 'REMITTER_C_CIF', 'BENEFICIARY_ENGLISH', 'BENEFICIARY_C_CIF']
+TRICS_nayose_columns = ['COUNTRY_FROM', 'COUNTRY_TO', 'COUNTRY_FROM_2', 'COUNTRY_TO_2', 'REMITTING_BANK_JP_BANK_GRP_2', 'BENEFICIARY_BANK_JP_BANK_GRP_2', 
+                         'REMITTER_ENGLISH', 'REMITTER_C_CIF', 'BENEFICIARY_ENGLISH', 'BENEFICIARY_C_CIF', 'REMITTER_NAYOSE_FLG', 'BENEFICIARY_NAYOSE_FLG']
 TRICS_cust_columns = ['REMITTER_ENGLISH', 'BENEFICIARY_ENGLISH']
-df_1, df_gdwh = return_table_data(TRICS_columns, 'trics_rm_worldwide_updated', 1000, 0, GDWH_columns) # Update filename accordingly
-df_2, df_gdwh = return_table_data(TRICS_columns, 'trics_rm_worldwide_201807', 1000, 0, GDWH_columns) # Update filename accordingly
-df_ = df_1.append(df_2, ignore_index = True) # Combine all files
-download_time = time.time() - start_time
-print ('The downloading of data took: %s seconds' % str(download_time))
-df_combined, df_customers = parse_table_data(TRICS_columns, TRICS_cust_columns, TRICS_combined_columns, GDWH_combined_columns)
-parse_time = time.time() - start_time - download_time
-print ('The parsing of data took: %s seconds' % str(parse_time))
-df_exact_match, df_fuzzy_match = total_match()
-match_time = time.time() - start_time - download_time - parse_time
-print ('The matching of data took: %s seconds' % str(match_time))
-df_main = consol()
+#df_1, df_gdwh = return_table_data(TRICS_nayose_columns, 'trics_rm_worldwide_201807', 1000, 0, GDWH_columns) # Update filename accordingly
+#df_2, df_gdwh = return_table_data(TRICS_nayose_columns, 'trics_rm_worldwide_201808', 1000, 0, GDWH_columns) # Update filename accordingly
+#df_3, df_gdwh = return_table_data(TRICS_nayose_columns, 'trics_rm_worldwide_201809', 1000, 0, GDWH_columns) # Update filename accordingly
+#df_ = df_1.append([df_2, df_3], ignore_index = True) # Combine all files
+#df_gdwh.dropna(subset = ['COUNTRY'], inplace = True)
+#df_iso = return_iso_table()
+#download_time = time.time() - start_time
+#print ('The downloading of data took: %s seconds' % str(download_time))
+#df_combined, df_customers = parse_table_data(TRICS_columns, TRICS_cust_columns, TRICS_combined_columns, GDWH_combined_columns)
+#parse_time = time.time() - start_time - download_time
+#print ('The parsing of data took: %s seconds' % str(parse_time))
+#df_exact_match, df_fuzzy_match = total_match()
+#match_time = time.time() - start_time - download_time - parse_time
+#print ('The matching of data took: %s seconds' % str(match_time))
+df_main, df_main_1, df_main_2 = consol()
 df_main.to_excel(r'Y:\MRDD_Temp\%s_RM.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+df_main_1.to_excel(r'Y:\MRDD_Temp\%s_RM_REMITTER.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+df_main_2.to_excel(r'Y:\MRDD_Temp\%s_RM_BENEFICIARY.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+
+#df_main = pd.read_excel(r'Y:\MRDD_Temp\20181109_RM.xlsx')
+#df_main.drop_duplicates(subset = [TRICS_columns[0], TRICS_columns[1], TRICS_columns[4]], inplace = True)
+#df1 = df_.copy()
+#del df1['BENEFICIARY_ENGLISH'], df1['REMITTING_BANK_JP_BANK_GRP_2'], df1['BENEFICIARY_BANK_JP_BANK_GRP_2'], df1['REMITTER_C_CIF'], df1['BENEFICIARY_C_CIF'], df1['REMITTER_NAYOSE_FLG'], df1['BENEFICIARY_NAYOSE_FLG']
+#df1 = df1[['COUNTRY_FROM_2', 'COUNTRY_TO_2', 'REMITTER_ENGLISH', 'COUNTRY_FROM', 'COUNTRY_TO']]
+#df1['COUNTRY_FROM_2'] = df1['COUNTRY_FROM_2'].str.replace('NETHERLANDS', 'NETHERLAND')
+#df1['COUNTRY_TO_2'] = df1['COUNTRY_TO_2'].str.replace("LAO PEOPLES", "LAO PEOPLE'S")
+#df_main_1 = pd.merge(df_main, df1, how = 'left', on = ['COUNTRY_FROM_2','COUNTRY_TO_2', 'REMITTER_ENGLISH'])
+#df_main_1 = df_main_1[[TRICS_nayose_columns[0], TRICS_nayose_columns[1], TRICS_columns[0], TRICS_columns[1], TRICS_columns[2], TRICS_columns[3], TRICS_columns[4], TRICS_columns[5], TRICS_nayose_columns[-2],
+#                  'PYTHON_COMPANY_A_BEST_MATCH', 'PYTHON_CCIF_A_BEST_MATCH', 'PYTHON_A_HIGHEST_RATIO', 'PYTHON_A_UPDATE_TAG',
+#                  TRICS_columns[6], TRICS_columns[7], TRICS_nayose_columns[-1],
+#                  'PYTHON_COMPANY_B_BEST_MATCH', 'PYTHON_CCIF_B_BEST_MATCH', 'PYTHON_B_HIGHEST_RATIO', 'PYTHON_B_UPDATE_TAG']]
+#del df_main_1[TRICS_columns[3]], df_main_1[TRICS_columns[6]], df_main_1[TRICS_columns[7]], df_main_1[TRICS_nayose_columns[-1]]
+#del df_main_1['PYTHON_COMPANY_B_BEST_MATCH'], df_main_1['PYTHON_CCIF_B_BEST_MATCH'], df_main_1['PYTHON_B_HIGHEST_RATIO'], df_main_1['PYTHON_B_UPDATE_TAG']
+#df_main_1['PYTHON_A_HIGHEST_RATIO'] = df_main_1['PYTHON_A_HIGHEST_RATIO'].astype(float)
+#df_main_1.sort_values(by = 'PYTHON_A_HIGHEST_RATIO', ascending = False, inplace = True)
+#df_main_1.drop_duplicates(subset = [TRICS_nayose_columns[0], TRICS_nayose_columns[1], TRICS_columns[0], TRICS_columns[1], TRICS_columns[4]], inplace = True)
+#df_main_1.index = np.arange(1, len(df_main_1) + 1)
+#df_main_1.to_excel(r'Y:\MRDD_Temp\%s_RM_REMITTER.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
+
+#df_main = pd.read_excel(r'Y:\MRDD_Temp\20181109_RM.xlsx')
+#df_main.drop_duplicates(subset = [TRICS_columns[0], TRICS_columns[1], TRICS_columns[6]], inplace = True)
+#df1 = df_.copy()
+#del df1['REMITTER_ENGLISH'], df1['REMITTING_BANK_JP_BANK_GRP_2'], df1['BENEFICIARY_BANK_JP_BANK_GRP_2'], df1['REMITTER_C_CIF'], df1['BENEFICIARY_C_CIF'], df1['REMITTER_NAYOSE_FLG'], df1['BENEFICIARY_NAYOSE_FLG']
+#df1 = df1[['COUNTRY_FROM_2', 'COUNTRY_TO_2', 'BENEFICIARY_ENGLISH', 'COUNTRY_FROM', 'COUNTRY_TO']]
+#df_main_2 = pd.merge(df_main, df1, how = 'left', on = ['COUNTRY_FROM_2', 'COUNTRY_TO_2', 'BENEFICIARY_ENGLISH'])
+#del df_main_2[TRICS_columns[2]], df_main_2[TRICS_columns[4]], df_main_2[TRICS_columns[5]], df_main_2[TRICS_nayose_columns[-2]]
+#del df_main_2['PYTHON_COMPANY_A_BEST_MATCH'], df_main_2['PYTHON_CCIF_A_BEST_MATCH'], df_main_2['PYTHON_A_HIGHEST_RATIO'], df_main_2['PYTHON_A_UPDATE_TAG']
+#df_main_2['PYTHON_B_HIGHEST_RATIO'] = df_main_2['PYTHON_B_HIGHEST_RATIO'].astype(float)
+#df_main_2.sort_values(by = 'PYTHON_B_HIGHEST_RATIO', ascending = False, inplace = True)
+#df_main_2.drop_duplicates(subset = [TRICS_nayose_columns[0], TRICS_nayose_columns[1], TRICS_columns[0], TRICS_columns[1], TRICS_columns[6]], inplace = True)
+#df_main_2.index = np.arange(1, len(df_main_2) + 1)
+#df_main_2.to_excel(r'Y:\MRDD_Temp\%s_RM_BENEFICIARY.xlsx' % datetime.datetime.now().strftime('%Y%m%d'))
