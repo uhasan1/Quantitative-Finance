@@ -1,9 +1,0 @@
-Select cflow.TICKET_USERID, cflow.TICKET_DATE, cflow.TICKET_SEQ_NO, cflow.LEG_NO, cflow.PYMNT_DATE, max(cflow.PYMNT_DATE) keep (dense_rank first order by cflow.PYMNT_DATE) pmtDate
-from CF_MAIN_CFLOW@SPO_ONLINE.WORLD cflow
-where TICKET_USERID LIKE 'ES1' AND TICKET_DATE LIKE '20-NOV-15' AND TICKET_SEQ_NO LIKE '2'
-group by cflow.TICKET_USERID, cflow.TICKET_DATE, cflow.TICKET_SEQ_NO, cflow.LEG_NO, cflow.PYMNT_DATE;
-
-Select cflow.TICKET_USERID, cflow.TICKET_DATE, cflow.TICKET_SEQ_NO, cflow.LEG_NO, max(cflow.SPREAD) keep (dense_rank first order by cflow.SPREAD) spread
-from CF_MAIN_CFLOW@SPO_ONLINE.WORLD cflow
-where TICKET_USERID LIKE 'ES1' AND TICKET_DATE LIKE '20-NOV-15' AND TICKET_SEQ_NO LIKE '2'
-group by cflow.TICKET_USERID, cflow.TICKET_DATE, cflow.TICKET_SEQ_NO, cflow.LEG_NO;
