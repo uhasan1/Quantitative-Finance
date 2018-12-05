@@ -1,0 +1,7 @@
+import PyPDF2
+
+with open ('test.pdf', 'rb') as file:
+    pdfreader = PyPDF2.PdfFileReader(file)
+    print(pdfreader.getPage(0).extractText())
+    
+## Creating a batch script -- c:\python27\python.exe c:\somescript.py %*
