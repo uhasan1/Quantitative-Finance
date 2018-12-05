@@ -1,6 +1,12 @@
+import time
 import PyPDF2
 
-with open ('test.pdf', 'rb') as file:
+with open (r'C:\Users\r15\.spyder-py3\test.pdf', 'rb') as file:
     pdfreader = PyPDF2.PdfFileReader(file)
     print(pdfreader.getPage(0).extractText())
     
+time.sleep(5)
+
+## Build exe with pyinstaller
+#1: Change directory to folder where pyinstaller is installed, e.g. cd C:\Users\r15\Anaconda3\Scripts
+#2: Then type in this: pyinstaller.exe --onefile C:\Users\r15\.spyder-py3\test.py
