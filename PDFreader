@@ -5,3 +5,4 @@ with open ('test.pdf', 'rb') as file:
     print(pdfreader.getPage(0).extractText())
     
 ## Creating a batch script -- c:\python27\python.exe c:\somescript.py %*
+## https://stackoverflow.com/questions/15031694/installing-python-packages-from-local-file-system-folder-to-virtualenv-with-pip
