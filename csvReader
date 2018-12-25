@@ -1,0 +1,32 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Text;
+using System.Data;
+using System.Data.OleDb;
+
+namespace CSVFileParser
+{
+    public class HanoiFX
+    {
+        static void Main(string[] args)
+        {
+            try
+            {
+                string data = File.ReadAllText("C:\\Users\\r15\\Downloads\\FL_insurance_sample.csv");
+                Console.WriteLine(data);
+            }
+
+            catch (Exception e)
+            {
+                Console.WriteLine("The file could not be read!");
+                Console.WriteLine(e.Message);
+            }
+            Console.ReadLine();
+        }
+    }
+}
