@@ -36,11 +36,11 @@ past_bene = ['COUNTRY_TO_2', 'BENEFICIARY_ENGLISH', 'BENEFICIARY_NAYOSE_FLG', 'P
 ## Establish connection to mySQL server
 def start_mySQL():
     conn = pyodbc.connect(r'DRIVER={MySQL ODBC 5.3 Unicode Driver};'
-                            r'SERVER=localhost;'
-                            r'PORT=3306;'
-                            r'DATABASE=gtbd;'
-                            r'UID=root;'
-                            r'PWD=root')
+                          r'SERVER=localhost;'
+                          r'PORT=3306;'
+                          r'DATABASE=gtbd;'
+                          r'UID=root;'
+                          r'PWD=root')
     cursor = conn.cursor()
     return conn, cursor
 
@@ -68,6 +68,9 @@ def return_other_tables(past_remit_file, past_bene_file):
     # Import GDWH customer list from mySQL server
     GDWH_column_list = ','.join(map(str, GDWH_columns))
     df_gdwh = pd.read_sql('SELECT %s FROM gtbd_custlist WHERE %s IS NOT NULL;' % (GDWH_column_list, GDWH_columns[0]), con = conn)
+    # Drop all invalid customer names, e.g. DUMMY, DELETED, DORMANT etc.
+    drop_list = ['DUMMY', 'DELETED', 'DORMANT', 'ABOLISH', 'REQUIRED FOR LONDON', 'TO BE USED', 'DUPLICATE', 'ITRAXX', 'DO NOT USE', 'LIMITED A C', 'LIMITED PURPOSE']
+    df_gdwh = df_gdwh[~df_gdwh[GDWH_columns[0]].str.contains('|'.join(drop_list))]
     
     # Import ISO_COUNTRY_CODE from mySQL server
     iso_column_list = ','.join(map(str, ['TRICS', '`Mizuho Branch`']))
@@ -91,7 +94,7 @@ def return_other_tables(past_remit_file, past_bene_file):
     df_past_remit = pd.read_sql('SELECT %s FROM %s WHERE %s IS NOT NULL;' % (past_remit_column_list, past_remit_file, past_remit[-1]), con = conn)
     # Rename columns
     df_past_remit.rename(columns = {past_remit[0]: 'COUNTRY', 
-                                    TRICS_cust_columns[0]: TRICS_combined_columns[0], 
+                                    TRICS_cust_columns[0]: TRICS_combined_columns[0],
                                     TRICS_nayose_columns[-2]: 'REMITTER_NAYOSE_FLAG'}, inplace = True)
     
     # Import past BENEFICIARY updates
@@ -108,7 +111,7 @@ def return_other_tables(past_remit_file, past_bene_file):
 ## Match REMITTING_ACCOUNT, BENEFICIARY_ACCOUNT and SENDERS_REFERENCE_NUMBER with DP_ACT_NO AND REF_NO to get correct CCIF and Nayose flag
 def nayose_ccif_update(df): 
     # Match SENDERS_REFERENCE_NUMBER with REF_NO and get correct CCIF for all matched records
-    df = pd.merge(df, df_ref_no, how = 'left', left_on = TRICS_nayose_columns[-5], right_on = GDWH_ccif_columns[0])
+    df = pd.merge(df, df_ref_no, how = 'left', left_on = TRICS_nayose_columns[-3], right_on = GDWH_ccif_columns[0])
     # Assign CUST_NO_CCIF values to REMITTER_C_CIF_2
     df[TRICS_ccif_columns[1]] = df[GDWH_ccif_columns[2]][df[GDWH_ccif_columns[2]].notnull()]
     # Remove unnecessary columns 
@@ -117,7 +120,7 @@ def nayose_ccif_update(df):
     # Match REMITTING_ACCOUNT with DP_ACT_NO and get correct CCIF for all matched records
     df = pd.merge(df, df_dw, how = 'left', left_on = TRICS_nayose_columns[-5], right_on = GDWH_ccif_columns[1])
     # Assign CUST_NO_CCIF values to REMITTER_C_CIF_2
-    df[TRICS_ccif_columns[1]] = df[GDWH_ccif_columns[2]][df[GDWH_ccif_columns[2]].notnull()]
+    df[TRICS_ccif_columns[1]][df[TRICS_ccif_columns[1]].isnull()] = df[GDWH_ccif_columns[2]][df[TRICS_ccif_columns[1]].isnull()]
     # Remove unnecessary columns 
     del df[GDWH_ccif_columns[1]], df[GDWH_ccif_columns[2]]
     
@@ -132,9 +135,9 @@ def nayose_ccif_update(df):
     df[TRICS_nayose_columns[-2]][df[TRICS_ccif_columns[1]].notnull()] = 1 
     df[TRICS_nayose_columns[-1]][df[TRICS_ccif_columns[3]].notnull()] = 1 
     
-    # Assign original REMITTER_C_CIF and BENEFICIARY_C_CIF to REMITTER_C_CIF_2 and BENEFICIARY_C_CIF_2 if the latter columns are null
-    df[TRICS_ccif_columns[1]][df[TRICS_ccif_columns[1]].isnull()] = df[TRICS_ccif_columns[0]][df[TRICS_ccif_columns[1]].isnull()]
-    df[TRICS_ccif_columns[3]][df[TRICS_ccif_columns[3]].isnull()] = df[TRICS_ccif_columns[2]][df[TRICS_ccif_columns[3]].isnull()]
+#    # Assign original REMITTER_C_CIF and BENEFICIARY_C_CIF to REMITTER_C_CIF_2 and BENEFICIARY_C_CIF_2 if the latter columns are null
+#    df[TRICS_ccif_columns[1]][df[TRICS_ccif_columns[1]].isnull()] = df[TRICS_ccif_columns[0]][df[TRICS_ccif_columns[1]].isnull()]
+#    df[TRICS_ccif_columns[3]][df[TRICS_ccif_columns[3]].isnull()] = df[TRICS_ccif_columns[2]][df[TRICS_ccif_columns[3]].isnull()]
     return df
 
 ## Parse data in standardized format
@@ -166,9 +169,6 @@ def parse_table_data(TRICS_columns, TRICS_cust_columns, TRICS_combined_columns, 
     # Drop all duplicates fromm GDWH customer names
     df_customers.dropna(subset = [GDWH_columns[0], GDWH_columns[1]], inplace = True)
     df_customers.drop_duplicates(subset = [GDWH_columns[0], GDWH_columns[2]], inplace = True)
-    # Drop all invalid customer names, e.g. DUMMY, DELETED, DORMANT etc.
-    drop_list = ['DUMMY', 'DELETED', 'DORMANT', 'ABOLISH', 'REQUIRED FOR LONDON', 'TO BE USED', 'DUPLICATE', 'ITRAXX', 'DO NOT USE', 'LIMITED A C', 'LIMITED PURPOSE']
-    df_customers = df_customers[~df_customers[GDWH_columns[0]].str.contains('|'.join(drop_list))]
     # Re-adjust column order
     df_customers = df_customers[[GDWH_columns[2], GDWH_columns[1], GDWH_columns[0]]]
     # Change the word 'VIET NAM' to 'VIETNAM', (2) 'NETHERLANDS' to 'NETHERLAND' and (3) 'LAO PEOPLES' to "LAO PEOPLE'S" in COUNTRY column
@@ -378,7 +378,7 @@ def total_match():
     df_exact_match['HIGHEST_RATIO'][df_exact_match['UPDATE_FLAG_REMIT'] == 'Y'] = df_exact_match[df_exact_match['UPDATE_FLAG_REMIT'] == 'Y']['PYTHON_A_HIGHEST_RATIO']
     df_exact_match['HIGHEST_RATIO'][df_exact_match['UPDATE_FLAG_BENE'] == 'Y'] = df_exact_match[df_exact_match['UPDATE_FLAG_BENE'] == 'Y']['PYTHON_B_HIGHEST_RATIO']
     df_exact_match['UPDATE_TAG'][df_exact_match['UPDATE_FLAG_REMIT'] == 'Y'] = 'PAST MANUAL CHECKING'
-    df_exact_match['UPDATE_TAG'][df_exact_match['UPDATE_FLAG_BENE'] == 'Y'] = 'PAST MANUAL CHECKING'
+    df_exact_match['UPDATE_TAG'][df_exact_match['UPDATE_FLAG_BENE'] == 'Y'] = 'PAST MANUAL CHECKING'   
     
     # Remove redundant columns
     del df_exact_match[TRICS_combined_columns[1]], df_exact_match[TRICS_combined_columns[2]], df_exact_match['MIZUHO']
@@ -389,7 +389,7 @@ def total_match():
     del df_exact_match['REMITTER_NAYOSE_FLAG'], df_exact_match['PYTHON_COMPANY_A_BEST_MATCH'], df_exact_match['PYTHON_CCIF_A_BEST_MATCH']
     del df_exact_match['PYTHON_A_HIGHEST_RATIO'], df_exact_match['PYTHON_A_UPDATE_TAG'], df_exact_match['UPDATE_FLAG_REMIT']
     del df_exact_match['BENEFICIARY_NAYOSE_FLAG'], df_exact_match['PYTHON_COMPANY_B_BEST_MATCH'], df_exact_match['PYTHON_CCIF_B_BEST_MATCH']
-    del df_exact_match['PYTHON_B_HIGHEST_RATIO'], df_exact_match['PYTHON_B_UPDATE_TAG'], df_exact_match['UPDATE_FLAG_BENE']
+    del df_exact_match['PYTHON_B_HIGHEST_RATIO'], df_exact_match['PYTHON_B_UPDATE_TAG'], df_exact_match['UPDATE_FLAG_BENE'] 
     
     # Query out the list of NaN cases in df_exact_match for complex fuzzy matching
     df_fuzzy_match = df_exact_match[(df_exact_match['HIGHEST_RATIO'].isnull()) & (df_exact_match['UPDATE_TAG'].isnull())]  
@@ -669,17 +669,36 @@ def consol():
                            'PYTHON_A_HIGHEST_RATIO': 'PYTHON_B_HIGHEST_RATIO',
                            'PYTHON_A_UPDATE_TAG': 'PYTHON_B_UPDATE_TAG'}, inplace = True)
     df_main = pd.merge(df_main, df_total_match, how = 'left', on = [TRICS_columns[1], TRICS_cust_columns[1]])
-    # Fill NaN values for Highest Ratio and Update Tag columns
-    df_main['PYTHON_A_HIGHEST_RATIO'].fillna('0', inplace = True)
-    df_main['PYTHON_B_HIGHEST_RATIO'].fillna('0', inplace = True)
-    df_main['PYTHON_A_UPDATE_TAG'].fillna('N', inplace = True)
-    df_main['PYTHON_B_UPDATE_TAG'].fillna('N', inplace = True)
     # Rearrange all the columns in df_main for readability
     df_main = df_main[[TRICS_nayose_columns[0], TRICS_nayose_columns[1], TRICS_columns[0], TRICS_columns[1], 
                        TRICS_columns[2], TRICS_columns[3], TRICS_columns[4], TRICS_columns[5], TRICS_ccif_columns[1], TRICS_nayose_columns[-2],
                        'PYTHON_COMPANY_A_BEST_MATCH', 'PYTHON_CCIF_A_BEST_MATCH', 'PYTHON_A_HIGHEST_RATIO', 'PYTHON_A_UPDATE_TAG',
                        TRICS_columns[6], TRICS_columns[7], TRICS_ccif_columns[-1], TRICS_nayose_columns[-1],
                        'PYTHON_COMPANY_B_BEST_MATCH', 'PYTHON_CCIF_B_BEST_MATCH', 'PYTHON_B_HIGHEST_RATIO', 'PYTHON_B_UPDATE_TAG']]
+    # Perform join and change UPDATE_TAG to 'MATCH INTERNAL RECORDS' if REMITTER/APPLICANT and BENEFICIARY CCIF2 is not blank 
+    # Return the GDWH customer names for non-blank CCIF2
+    df_main = pd.merge(df_main, df_gdwh, how = 'left', left_on = TRICS_ccif_columns[1], right_on = GDWH_columns[1])
+    df_main[TRICS_ccif_columns[1]][df_main[TRICS_ccif_columns[1]] == '*'] = np.nan 
+    df_main['PYTHON_COMPANY_A_BEST_MATCH'][df_main[TRICS_ccif_columns[1]].notnull()] = df_main[df_main[TRICS_ccif_columns[1]].notnull()][GDWH_columns[0]]
+    df_main['PYTHON_CCIF_A_BEST_MATCH'][df_main[TRICS_ccif_columns[1]].notnull()] = df_main[df_main[TRICS_ccif_columns[1]].notnull()][GDWH_columns[1]]
+    df_main['PYTHON_A_HIGHEST_RATIO'][df_main[TRICS_ccif_columns[1]].notnull()] = '1'
+    df_main['PYTHON_A_UPDATE_TAG'][df_main[TRICS_ccif_columns[1]].notnull()] = 'MATCH INTERNAL RECORDS'
+    # Remove unnecessary columns 
+    del df_main[GDWH_columns[0]], df_main[GDWH_columns[1]], df_main[GDWH_columns[2]]
+    # Return the GDWH customer names for non-blank CCIF2
+    df_main = pd.merge(df_main, df_gdwh, how = 'left', left_on = TRICS_ccif_columns[-1], right_on = GDWH_columns[1])
+    df_main[TRICS_ccif_columns[-1]][df_main[TRICS_ccif_columns[-1]] == '*'] = np.nan 
+    df_main['PYTHON_COMPANY_B_BEST_MATCH'][df_main[TRICS_ccif_columns[-1]].notnull()] = df_main[df_main[TRICS_ccif_columns[-1]].notnull()][GDWH_columns[0]]
+    df_main['PYTHON_CCIF_B_BEST_MATCH'][df_main[TRICS_ccif_columns[-1]].notnull()] = df_main[df_main[TRICS_ccif_columns[-1]].notnull()][GDWH_columns[1]]
+    df_main['PYTHON_B_HIGHEST_RATIO'][df_main[TRICS_ccif_columns[-1]].notnull()] = '1'
+    df_main['PYTHON_B_UPDATE_TAG'][df_main[TRICS_ccif_columns[-1]].notnull()] = 'MATCH INTERNAL RECORDS'
+    # Remove unnecessary columns 
+    del df_main[GDWH_columns[0]], df_main[GDWH_columns[1]], df_main[GDWH_columns[2]]     
+    # Fill NaN values for Highest Ratio and Update Tag columns
+    df_main['PYTHON_A_HIGHEST_RATIO'].fillna('0', inplace = True)
+    df_main['PYTHON_B_HIGHEST_RATIO'].fillna('0', inplace = True)
+    df_main['PYTHON_A_UPDATE_TAG'].fillna('N', inplace = True)
+    df_main['PYTHON_B_UPDATE_TAG'].fillna('N', inplace = True)
     # Update starting index from 0 to 1  
     df_main.index = np.arange(1, len(df_main) + 1)
     
@@ -698,6 +717,7 @@ def consol():
     df_main_1['UPDATE_FLAG_REMIT'] = ''
     df_main_1['UPDATE_FLAG_REMIT'][df_main_1['PYTHON_A_UPDATE_TAG'] == 'EXACT NAME'] = 'Y'
     df_main_1['UPDATE_FLAG_REMIT'][df_main_1['PYTHON_A_UPDATE_TAG'] == 'PAST MANUAL CHECKING'] = 'Y'
+    df_main_1['UPDATE_FLAG_REMIT'][df_main_1['PYTHON_A_UPDATE_TAG'] == 'MATCH INTERNAL RECORDS'] = 'Y'
     df_main_1['UPDATE_FLAG_REMIT'][df_main_1['PYTHON_A_UPDATE_TAG'] == 'NO COUNTRY BRANCH'] = 'N'
     df_main_1['UPDATE_FLAG_REMIT'][df_main_1['PYTHON_A_UPDATE_TAG'] == 'FUTURE CUSTOMER TARGETING'] = 'N'    
     # Rename/Remove columns and update past manual checking results in df_main_1
@@ -706,10 +726,12 @@ def consol():
                               TRICS_combined_columns[0]: TRICS_cust_columns[0], 
                               TRICS_nayose_columns[-2]: 'REMITTER_NAYOSE_FLAG',
                               'UPDATE_FLAG_REMIT': 'UPDATE_FLAG'}, inplace = True)
-    del df_temp['REMITTER_NAYOSE_FLAG'], df_temp['PYTHON_CCIF_A_BEST_MATCH'], df_temp['PYTHON_A_HIGHEST_RATIO'], df_temp['PYTHON_A_UPDATE_TAG']
+    del df_temp['REMITTER_NAYOSE_FLAG'], df_temp['PYTHON_A_UPDATE_TAG']
+    del df_temp['PYTHON_CCIF_A_BEST_MATCH'], df_temp['PYTHON_A_HIGHEST_RATIO'] 
     df_main_1 = pd.merge(df_main_1, df_temp, how = 'left', on = [TRICS_columns[0], TRICS_cust_columns[0], 'PYTHON_COMPANY_A_BEST_MATCH'])
-    df_main_1['PYTHON_A_UPDATE_TAG'][df_main_1['UPDATE_FLAG'] == 'N'] = 'PAST MANUAL CHECKING' 
-    df_main_1['UPDATE_FLAG_REMIT'][df_main_1['UPDATE_FLAG'] == 'N'] = 'N' 
+    df_main_1['PYTHON_A_UPDATE_TAG'][(df_main_1['UPDATE_FLAG'] == 'N') & (df_main_1[TRICS_ccif_columns[1]].isnull())] = 'PAST MANUAL CHECKING' 
+    df_main_1['UPDATE_FLAG_REMIT'][(df_main_1['UPDATE_FLAG'] == 'N') & (df_main_1[TRICS_ccif_columns[1]].isnull())] = 'N' 
+    df_main_1['UPDATE_FLAG_REMIT'][(df_main_1['PYTHON_COMPANY_A_BEST_MATCH'].isnull()) & (df_main_1[TRICS_ccif_columns[1]].notnull())] = 'N' 
     del df_main_1['UPDATE_FLAG']
     # Check whether countries/capitals/cities in REMITTER_ENGLISH match with PYTHON_COMPANY_A_BEST_MATCH  
     # If it does not match, update UPDATE_FLAG_REMIT with a 'N' flag
@@ -745,6 +767,7 @@ def consol():
     df_main_2['UPDATE_FLAG_BENE'] = ''
     df_main_2['UPDATE_FLAG_BENE'][df_main_2['PYTHON_B_UPDATE_TAG'] == 'EXACT NAME'] = 'Y'
     df_main_2['UPDATE_FLAG_BENE'][df_main_2['PYTHON_B_UPDATE_TAG'] == 'PAST MANUAL CHECKING'] = 'Y'
+    df_main_2['UPDATE_FLAG_BENE'][df_main_2['PYTHON_B_UPDATE_TAG'] == 'MATCH INTERNAL RECORDS'] = 'Y'
     df_main_2['UPDATE_FLAG_BENE'][df_main_2['PYTHON_B_UPDATE_TAG'] == 'NO COUNTRY BRANCH'] = 'N'
     df_main_2['UPDATE_FLAG_BENE'][df_main_2['PYTHON_B_UPDATE_TAG'] == 'FUTURE CUSTOMER TARGETING'] = 'N'
     # Rename/Remove columns and update past manual checking results in df_main_2
@@ -753,10 +776,12 @@ def consol():
                               TRICS_combined_columns[0]: TRICS_cust_columns[1], 
                               TRICS_nayose_columns[-1]: 'BENEFICIARY_NAYOSE_FLAG',
                               'UPDATE_FLAG_BENE': 'UPDATE_FLAG'}, inplace = True)
-    del df_temp['BENEFICIARY_NAYOSE_FLAG'], df_temp['PYTHON_CCIF_B_BEST_MATCH'], df_temp['PYTHON_B_HIGHEST_RATIO'], df_temp['PYTHON_B_UPDATE_TAG']
+    del df_temp['BENEFICIARY_NAYOSE_FLAG'], df_temp['PYTHON_B_UPDATE_TAG']
+    del df_temp['PYTHON_CCIF_B_BEST_MATCH'], df_temp['PYTHON_B_HIGHEST_RATIO']
     df_main_2 = pd.merge(df_main_2, df_temp, how = 'left', on = [TRICS_columns[1], TRICS_cust_columns[1], 'PYTHON_COMPANY_B_BEST_MATCH'])
-    df_main_2['PYTHON_B_UPDATE_TAG'][df_main_2['UPDATE_FLAG'] == 'N'] = 'PAST MANUAL CHECKING' 
-    df_main_2['UPDATE_FLAG_BENE'][df_main_2['UPDATE_FLAG'] == 'N'] = 'N' 
+    df_main_2['PYTHON_B_UPDATE_TAG'][(df_main_2['UPDATE_FLAG'] == 'N') & (df_main_2[TRICS_ccif_columns[-1]].isnull())] = 'PAST MANUAL CHECKING' 
+    df_main_2['UPDATE_FLAG_BENE'][(df_main_2['UPDATE_FLAG'] == 'N') & (df_main_2[TRICS_ccif_columns[-1]].isnull())] = 'N'
+    df_main_2['UPDATE_FLAG_BENE'][(df_main_2['PYTHON_COMPANY_B_BEST_MATCH'].isnull()) & (df_main_2[TRICS_ccif_columns[-1]].notnull())] = 'N' 
     del df_main_2['UPDATE_FLAG']
     # Check whether countries/capitals/cities in BENEFICIARY_ENGLISH match with PYTHON_COMPANY_B_BEST_MATCH  
     # If it does not match, update UPDATE_FLAG_BENE with a 'N' flag
@@ -783,11 +808,11 @@ def consol():
 ## Execute conditions
 start_time = time.time()
 conn, cursor = start_mySQL()
-df_ = return_trics_data(TRICS_nayose_columns, 'trics_rm_worldwide_201807_201809', 1000, 0) # Update filename accordingly
-#df_2 = return_trics_data(TRICS_nayose_columns, 'trics_rm_worldwide_201808', 1000, 0) # Update filename accordingly
+df_1 = return_trics_data(TRICS_nayose_columns, 'trics_rm_worldwide_201807_201809', 1000, 0) # Update filename accordingly
+df_2 = return_trics_data(TRICS_nayose_columns, 'trics_rm_worldwide_201810', 1000, 0) # Update filename accordingly
 #df_3 = return_trics_data(TRICS_nayose_columns, 'trics_rm_worldwide_201809', 1000, 0) # Update filename accordingly
-#df_ = df_1.append([df_2, df_3], ignore_index = True) # Combine all files
-df_gdwh, df_iso, df_ref_no, df_dw, df_past_remit, df_past_bene = return_other_tables('rm_remitter_past_updates', 'rm_beneficiary_past_updates')
+df_ = df_1.append([df_2], ignore_index = True) # Combine all files
+df_gdwh, df_iso, df_ref_no, df_dw, df_past_remit, df_past_bene = return_other_tables('rm_remitter_past', 'rm_beneficiary_past')
 df_gdwh.dropna(subset = ['COUNTRY'], inplace = True)
 download_time = time.time() - start_time
 print ('The downloading of data took: %s seconds' % str(download_time))
