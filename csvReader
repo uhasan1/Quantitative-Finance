@@ -9,6 +9,9 @@ using System.Text;
 using System.Data;
 using System.Data.OleDb;
 
+
+
+
 namespace CSVFileParser
 {
     public class HanoiFX
@@ -28,5 +31,29 @@ namespace CSVFileParser
             }
             Console.ReadLine();
         }
+    }
+}
+
+namespace MrrsExtensions.Pocos
+{
+    /// <summary>
+    /// Poco for VaR Tab in the Market Risk Report. About 500 rows (trading and banking 250 each)
+    /// </summary>
+    public class ValueAtRisk
+    {
+        public string MONITORING_SET_NAME { get; set; }
+        public string PORTFOLIO { get; set; }
+        public DateTime VALUATION_DATE { get; set; }
+        public string CURRENCY { get; set; }
+        public double VAR { get; set; }//amount of VaR
+        public double ADJUSTMENT_FACTOR { get; set; }
+        public double? NO_ACTION_PL { get; set; }// this is from back test
+        public bool? IsExcess { get; set; }
+
+        public static string GetImportCommand()
+        {
+            return System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + @"\bin\Queries\Import\Import_TBL_Var.sql");
+        }
+
     }
 }
