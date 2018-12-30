@@ -57,3 +57,24 @@ namespace MrrsExtensions.Pocos
 
     }
 }
+
+try
+            {
+                // Read the file using a StreamReader and display the contents
+                using (StreamReader sr = new StreamReader(@"C:\Users\r15\Downloads\Hanoi_FX.csv"))
+                {
+                    string data;
+                    do
+                    {
+                        data = sr.ReadLine();
+                        Console.WriteLine(data);
+                    } while (data != null);
+                }
+            }
+
+            catch (Exception e)
+            {
+                Console.WriteLine("The file could not be read!");
+                Console.WriteLine(e.Message);
+            }
+            Console.ReadLine();
