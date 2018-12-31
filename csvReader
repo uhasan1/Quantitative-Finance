@@ -9,26 +9,42 @@ using System.Text;
 using System.Data;
 using System.Data.OleDb;
 
-
-
-
 namespace CSVFileParser
 {
     public class HanoiFX
     {
+        public int UploadFlag { get; set; }
+        public string Code { get; set; }
+        public int SourceData { get; set; }
+        public string DealerID { get; set; }
+        public string Bank1DealingCode { get; set; }
+        public string BrokerDealingCode { get; set; }
+        public int DealType { get; set; }
+        public string Currency1 { get; set; }
+        public double DealVolumeCurrency1 { get; set; }
+        public DateTime ValueDatePeriod1Currency1 { get; set; }
+        public string LocalTCID { get; set; }
+        public string TradingArea { get; set; }
+        public string UserDefinedData1 { get; set; }
+        public string UserDefinedData5 { get; set; }
+        public string Currency2 { get; set; }
+        public double ExchangeratePeriod1 { get; set; }
+        public int RateDirection { get; set; }
+
         static void Main(string[] args)
         {
             try
             {
-                string data = File.ReadAllText("C:\\Users\\r15\\Downloads\\FL_insurance_sample.csv");
+                string data = File.ReadAllText("C:\\Users\\CY2241\\Swap_rates.xlsx");
                 Console.WriteLine(data);
             }
-
+            
             catch (Exception e)
             {
                 Console.WriteLine("The file could not be read!");
                 Console.WriteLine(e.Message);
             }
+            
             Console.ReadLine();
         }
     }
