@@ -6,16 +6,90 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
-using System.Data;
-using System.Data.OleDb;
 
 namespace CSVFileParser
 {
     public class HanoiFX
     {
+        static void Main(string[] args)
+        {
+            try
+            {
+                DataTable HanoiFXData = ImportCSV();
+                //InspectData(HanoiFXData); // Use when necessary
+                string importSuccess = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: File is imported successfully.";
+                SuccessLog(importSuccess);
+            }
+
+            catch (Exception e)
+            {
+                string importError = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: " + e.Message;
+                ErrorLog(importError);
+            }
+            Console.ReadLine();
+        }
+
+        static DataTable ImportCSV()
+        {
+            // Import the file and display the contents
+            DataTable table = new DataTable();
+            using (StreamReader file = new StreamReader(@"C:\Users\r15\Downloads\Hanoi_FX.csv")) // Update Directory
+            {
+                // Separate column headers using pipe delimiter
+                string[] headers = file.ReadLine().Split('|');
+
+                foreach (string header in headers)
+                {
+                    table.Columns.Add(header);
+                }
+
+                while (!file.EndOfStream)
+                {
+                    // Separate column data using pipe delimiter
+                    string[] rows = file.ReadLine().Split('|');
+                    DataRow row = table.NewRow();
+
+                    for (int i = 0; i < headers.Length; i++)
+                    {
+                        row[i] = rows[i];
+                    }
+                    table.Rows.Add(row);
+                }
+            }
+            return table;
+        }
+
+        static void InspectData(DataTable Table)
+        {
+            foreach (DataRow row in Table.Rows)
+            {
+                foreach (var item in row.ItemArray)
+                {
+                    Console.WriteLine(item);
+                }
+            }
+        }
+
+        static void SuccessLog(string StatusMsg)
+        {
+            // Stores all successful status in log file 
+            string FilePath = String.Format(@"C:\Users\r15\Downloads\Success_{0}.txt", DateTime.Today.ToString("yyyyMMdd"));
+            File.AppendAllText(FilePath, StatusMsg.ToString() + Environment.NewLine);
+        }
+
+        static void ErrorLog(string StatusMsg)
+        {
+            // Stores all error status in log file 
+            string FilePath = String.Format(@"C:\Users\r15\Downloads\Error_{0}.txt", DateTime.Today.ToString("yyyyMMdd"));
+            File.AppendAllText(FilePath, StatusMsg.ToString() + Environment.NewLine);
+        }
+
+    }
+}
+
         public int UploadFlag { get; set; }
         public string Code { get; set; }
         public int SourceData { get; set; }
@@ -34,24 +108,7 @@ namespace CSVFileParser
         public double ExchangeratePeriod1 { get; set; }
         public int RateDirection { get; set; }
 
-        static void Main(string[] args)
-        {
-            try
-            {
-                string data = File.ReadAllText("C:\\Users\\CY2241\\Swap_rates.xlsx");
-                Console.WriteLine(data);
-            }
-            
-            catch (Exception e)
-            {
-                Console.WriteLine("The file could not be read!");
-                Console.WriteLine(e.Message);
-            }
-            
-            Console.ReadLine();
-        }
-    }
-}
+       
 
 namespace MrrsExtensions.Pocos
 {
