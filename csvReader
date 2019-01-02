@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Data;
 
@@ -19,7 +18,7 @@ namespace CSVFileParser
             {
                 // Import the CSV file
                 DataTable HanoiFXData = ImportCSV(FilePath);
-                
+
                 // Update job status after CSV import
                 string importSuccess = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: File is imported successfully.";
                 SuccessLog(FilePath, importSuccess);
