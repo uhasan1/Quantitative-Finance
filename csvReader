@@ -1,14 +1,12 @@
 ## https://docs.microsoft.com/en-us/dotnet/api/system.data.datatable?view=netframework-4.7.2
-## Datatable and Dataset
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Data;
 using System.Linq;
-using System.Linq.Expressions;
+using System.Text;
+using System.Data;
 
 namespace CSVFileParser
 {
@@ -16,27 +14,35 @@ namespace CSVFileParser
     {
         static void Main(string[] args)
         {
+            string FilePath = @"H:\Clement\Cat1B\"; // Update Directory
             try
             {
-                DataTable HanoiFXData = ImportCSV();
-                //InspectData(HanoiFXData); // Use when necessary
+                // Import the CSV file
+                DataTable HanoiFXData = ImportCSV(FilePath);
+                
+                // Update job status after CSV import
                 string importSuccess = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: File is imported successfully.";
-                SuccessLog(importSuccess);
+                SuccessLog(FilePath, importSuccess);
+                
+                // Create Devon Table based on cost rate
+                DataTable DevonTable = CreateDevonTable(HanoiFXData);
+                InspectData(DevonTable);
             }
 
             catch (Exception e)
             {
+                // Update job status for errors
                 string importError = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: " + e.Message;
-                ErrorLog(importError);
+                ErrorLog(FilePath, importError);
             }
             Console.ReadLine();
         }
 
-        static DataTable ImportCSV()
+        static DataTable ImportCSV(string FilePath)
         {
             // Import the file and display the contents
             DataTable table = new DataTable();
-            using (StreamReader file = new StreamReader(@"C:\Users\r15\Downloads\Hanoi_FX.csv")) // Update Directory
+            using (StreamReader file = new StreamReader(FilePath + "Hanoi_FX.csv")) 
             {
                 // Separate column headers using pipe delimiter
                 string[] headers = file.ReadLine().Split('|');
@@ -62,7 +68,131 @@ namespace CSVFileParser
             return table;
         }
 
-        static void InspectData(DataTable Table)
+        private static DataTable CreateDevonTable(DataTable Source)
+        {
+            // Create a new DataTable - Cost Rate
+            DataTable table = new DataTable("DevonTable");
+
+            // Define new DataColumns, DataTypes and ColumnNames
+            DataColumn[] cols = 
+                {
+                new DataColumn("UploadFlag",                typeof(Int32)),
+                new DataColumn("Code",                      typeof(String)),
+                new DataColumn("SourceData",                typeof(Int32)),
+                new DataColumn("DealerID",                  typeof(String)),
+                new DataColumn("Bank1DealingCode",          typeof(String)),
+                new DataColumn("BrokerDealingCode",         typeof(String)),
+                new DataColumn("DealType",                  typeof(Int32)),
+                new DataColumn("Currency1",                 typeof(String)),
+                new DataColumn("DealVolumeCurrency1",       typeof(Double)),
+                new DataColumn("ValueDatePeriod1Currency1", typeof(DateTime)),
+                new DataColumn("LocalTCID",                 typeof(String)),
+                new DataColumn("TradingArea",               typeof(String)),
+                new DataColumn("UserDefinedData1",          typeof(String)),
+                new DataColumn("UserDefinedData5",          typeof(String)),
+                new DataColumn("Currency2",                 typeof(String)),
+                new DataColumn("ExchangeRatePeriod1",       typeof(Double)),
+                new DataColumn("RateDirection ",            typeof(Int32))
+                };
+
+            // Add DataColumns to DataTable
+            table.Columns.AddRange(cols);
+            
+            // Create DataRows based on data imported from CSV
+            foreach (DataRow srcrow in Source.Rows)
+            {
+                DataRow row = table.NewRow();
+
+                // (1)  UploadFlag 
+                row["UploadFlag"] = 0;
+
+                // (2)  Code
+                //row["Code"] = 
+
+                // (3)  SourceData 
+                row["SourceData"] = 1;
+
+                // (4)  DealerID
+                row["DealerID"] = "tasaiyu1";
+
+                // (5)  Bank1DealingCode
+                //row["Bank1DealingCode"] = 
+
+                // (6)  BrokerDealingCode 
+                row["BrokerDealingCode"] = "DUMMYBR";
+
+                // (7)  DealType
+                if (srcrow["BUY_SELL_FLAG"].ToString().Contains("B"))
+                {
+                    row["DealType"] = 1;
+                }
+                else if (srcrow["BUY_SELL_FLAG"].ToString().Contains("S"))
+                {
+                    row["DealType"] = 2;
+                }
+
+                // (8)  Currency1
+
+
+                // (9)  DealVolumeCurrency1
+
+                // (10) ValueDatePeriod1Currency1  
+
+                // (11) LocalTCID 
+                row["LocalTCID"] = "MHCBSPO";
+
+                // (12) TradingArea
+                if (srcrow["BANK_FLAG"].ToString().Contains("Y"))
+                {
+                    row["TradingArea"] = "INTERBANK";
+                }
+                else if (srcrow["BANK_FLAG"].ToString().Contains("N"))
+                {
+                    row["TradingArea"] = "CUSTOMER";
+                }
+
+                // (13) UserDefinedData1
+                row["UserDefinedData1"] = "C1BHAN1";
+
+                // (14) userDefinedData5 
+                row["UserDefinedData5"] = "DUMMY";
+
+                // (15) Currency2
+
+                // (16) ExchangeRatePeriod1 
+                if (string.IsNullOrEmpty(srcrow["INTERNAL_RATE"].ToString()))
+                {
+                    row["ExchangeRatePeriod1"] = srcrow["EXCHANGE_RATE"];
+                }
+                else 
+                {
+                    row["ExchangeRatePeriod1"] = srcrow["INTERNAL_RATE"];
+                }
+
+                // (17) RateDirection 
+
+                table.Rows.Add(row);
+
+            }
+            
+            return table;
+        }
+
+        static void SuccessLog(string FilePath, string StatusMsg)
+        {
+            // Stores all successful status in log file 
+            string FileName = String.Format(FilePath + "Success_{0}.txt", DateTime.Today.ToString("yyyyMMdd"));
+            File.AppendAllText(FileName, StatusMsg.ToString() + Environment.NewLine);
+        }
+
+        static void ErrorLog(string FilePath, string StatusMsg)
+        {
+            // Stores all error status in log file 
+            string FileName = String.Format(FilePath + "Error_{0}.txt", DateTime.Today.ToString("yyyyMMdd"));
+            File.AppendAllText(FileName, StatusMsg.ToString() + Environment.NewLine);
+        }
+
+        static void InspectData(DataTable Table) // This can be invoked if we wish to check the relevant DataTable
         {
             foreach (DataRow row in Table.Rows)
             {
@@ -73,85 +203,5 @@ namespace CSVFileParser
             }
         }
 
-        static void SuccessLog(string StatusMsg)
-        {
-            // Stores all successful status in log file 
-            string FilePath = String.Format(@"C:\Users\r15\Downloads\Success_{0}.txt", DateTime.Today.ToString("yyyyMMdd"));
-            File.AppendAllText(FilePath, StatusMsg.ToString() + Environment.NewLine);
-        }
-
-        static void ErrorLog(string StatusMsg)
-        {
-            // Stores all error status in log file 
-            string FilePath = String.Format(@"C:\Users\r15\Downloads\Error_{0}.txt", DateTime.Today.ToString("yyyyMMdd"));
-            File.AppendAllText(FilePath, StatusMsg.ToString() + Environment.NewLine);
-        }
-
     }
 }
-
-        public int UploadFlag { get; set; }
-        public string Code { get; set; }
-        public int SourceData { get; set; }
-        public string DealerID { get; set; }
-        public string Bank1DealingCode { get; set; }
-        public string BrokerDealingCode { get; set; }
-        public int DealType { get; set; }
-        public string Currency1 { get; set; }
-        public double DealVolumeCurrency1 { get; set; }
-        public DateTime ValueDatePeriod1Currency1 { get; set; }
-        public string LocalTCID { get; set; }
-        public string TradingArea { get; set; }
-        public string UserDefinedData1 { get; set; }
-        public string UserDefinedData5 { get; set; }
-        public string Currency2 { get; set; }
-        public double ExchangeratePeriod1 { get; set; }
-        public int RateDirection { get; set; }
-
-       
-
-namespace MrrsExtensions.Pocos
-{
-    /// <summary>
-    /// Poco for VaR Tab in the Market Risk Report. About 500 rows (trading and banking 250 each)
-    /// </summary>
-    public class ValueAtRisk
-    {
-        public string MONITORING_SET_NAME { get; set; }
-        public string PORTFOLIO { get; set; }
-        public DateTime VALUATION_DATE { get; set; }
-        public string CURRENCY { get; set; }
-        public double VAR { get; set; }//amount of VaR
-        public double ADJUSTMENT_FACTOR { get; set; }
-        public double? NO_ACTION_PL { get; set; }// this is from back test
-        public bool? IsExcess { get; set; }
-
-        public static string GetImportCommand()
-        {
-            return System.IO.File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + @"\bin\Queries\Import\Import_TBL_Var.sql");
-        }
-
-    }
-}
-
-try
-            {
-                // Read the file using a StreamReader and display the contents
-                using (StreamReader sr = new StreamReader(@"C:\Users\r15\Downloads\Hanoi_FX.csv"))
-                {
-                    string data;
-                    do
-                    {
-                        data = sr.ReadLine();
-                        Console.WriteLine(data);
-                    } while (data != null);
-                }
-            }
-
-            catch (Exception e)
-            {
-                Console.WriteLine("The file could not be read!");
-                Console.WriteLine(e.Message);
-            }
-            Console.ReadLine();
- 
