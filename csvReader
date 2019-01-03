@@ -1,10 +1,6 @@
-## https://docs.microsoft.com/en-us/dotnet/api/system.data.datatable?view=netframework-4.7.2
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Text;
+using System.Linq;
 using System.Data;
 
 namespace CSVFileParser
@@ -16,36 +12,39 @@ namespace CSVFileParser
             string FilePath = @"H:\Clement\Cat1B\"; // Update Directory
             try
             {
-                // Import the CSV file
-                DataTable HanoiFXData = ImportCSV(FilePath);
+                // Import Currency Pair CSV file
+                DataTable CurrencyPair = ImportCSV(FilePath, "CURRENCY_PAIR.csv");
 
-                // Update job status after CSV import
+                // Import Hanoi FX transaction CSV file
+                DataTable HanoiFXData = ImportCSV(FilePath, "HANOI_FX.csv");
+
+                // Update job status after Hanoi FX transaction CSV import
                 string importSuccess = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: File is imported successfully.";
                 SuccessLog(FilePath, importSuccess);
-                
+
                 // Create Devon Table based on cost rate
-                DataTable DevonTable = CreateDevonTable(HanoiFXData);
+                DataTable DevonTable = CreateDevonTable(HanoiFXData, CurrencyPair);
                 InspectData(DevonTable);
 
-                // Update job status after conversion
+                // Update job status after creation of Devon Table
                 string convSuccess = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: File is converted successfully.";
                 SuccessLog(FilePath, convSuccess);
             }
 
             catch (Exception e)
             {
-                // Update job status for errors
+                // Update nature of error if job abend
                 string Error = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: " + e.Message;
                 ErrorLog(FilePath, Error);
             }
             Console.ReadLine();
         }
 
-        static DataTable ImportCSV(string FilePath)
+        static DataTable ImportCSV(string FilePath, string FileName)
         {
             // Import the file and display the contents
             DataTable table = new DataTable();
-            using (StreamReader file = new StreamReader(FilePath + "Hanoi_FX.csv")) 
+            using (StreamReader file = new StreamReader(FilePath + FileName))
             {
                 // Separate column headers using pipe delimiter
                 string[] headers = file.ReadLine().Split('|');
@@ -62,31 +61,49 @@ namespace CSVFileParser
                     DataRow row = table.NewRow();
 
                     for (int i = 0; i < headers.Length; i++)
-                    {
-                        if (i == 53) // Column number for VALUE_DATE
-                        {
-                            row[i] = DateTime.Parse((rows[i].ToString())).ToString("yyyyMMdd");
-                        }
-                        
-                        else
-                        {
-                            row[i] = rows[i];
-                        }
-                        
+                    {                    
+                        row[i] = rows[i]; 
                     }
-                    table.Rows.Add(row);
+
+                    if (FileName.Contains("CURRENCY_PAIR"))
+                    {
+                        // Add DataRow to DataTable
+                        table.Rows.Add(row);
+                    }
+
+                    else if (FileName.Contains("HANOI_FX"))
+                        // Parse VALUE_DATE (column number = 53) in YYYYMMDD format
+                        row[53] = DateTime.Parse((rows[53].ToString())).ToString("yyyyMMdd");
+
+                        // Include only FX transactions that are approved by Back Office and/or Treasury
+                        // Use STATUS (column number = 3), INTIATIOR_USER_GROUP (column number = 1) and DIRECT_DEAL_FLAG (column number = 7)
+                        if (row[3].ToString().Contains("99") ||
+
+                            row[3].ToString().Contains("98") ||
+
+                            (new[] { "07", "13", "14", "15", "16", "17", "18", "19", "96"}.Any(row[3].ToString().Contains)
+                            && row[1].ToString().Contains("03")
+                            && row[7].ToString().Contains("Y")) ||
+
+                            (new[] { "06", "10", "11"}.Any(row[3].ToString().Contains) &&
+                            (row[7].ToString().Contains("N") || ((!row[1].ToString().Contains("03")) && row[7].ToString().Contains("Y"))))
+                            )
+                        {
+                            // Add DataRow to DataTable
+                            table.Rows.Add(row);
+                        }
                 }
             }
             return table;
         }
 
-        private static DataTable CreateDevonTable(DataTable Source)
+        private static DataTable CreateDevonTable(DataTable Source, DataTable CCYPair)
         {
             // Create a new DataTable - Cost Rate
             DataTable table = new DataTable("DevonTable");
 
             // Define new DataColumns, DataTypes and ColumnNames
-            DataColumn[] cols = 
+            DataColumn[] cols =
                 {
                 new DataColumn("UploadFlag",                typeof(Int32)),
                 new DataColumn("Code",                      typeof(String)),
@@ -104,12 +121,12 @@ namespace CSVFileParser
                 new DataColumn("UserDefinedData5",          typeof(String)),
                 new DataColumn("Currency2",                 typeof(String)),
                 new DataColumn("ExchangeRatePeriod1",       typeof(Double)),
-                new DataColumn("RateDirection ",            typeof(Int32))
+                new DataColumn("RateDirection",            typeof(Int32))
                 };
 
             // Add DataColumns to DataTable
             table.Columns.AddRange(cols);
-            
+
             // Create DataRows based on data imported from CSV
             foreach (DataRow srcrow in Source.Rows)
             {
@@ -200,17 +217,35 @@ namespace CSVFileParser
                 {
                     row["ExchangeRatePeriod1"] = srcrow["EXCHANGE_RATE"];
                 }
-                else 
+                else
                 {
                     row["ExchangeRatePeriod1"] = srcrow["INTERNAL_RATE"];
                 }
 
                 // (17) RateDirection 
+                string DevonPair = row["Currency1"].ToString() + row["Currency2"].ToString();
 
+                foreach (DataRow ccyrow in CCYPair.Rows)
+                {
+                    // Check DevonPair follows Mkt Convention 
+                    // Use CURRENCY_PAIR_1 (column number 2), CURRENCY_PAIR_2 (i.e. column number = 3) and UNIT_CURRENCY (column number = 4)
+                    if (ccyrow["CURRENCY_PAIR_1"].ToString().Contains(DevonPair))
+                    {
+                        row["RateDirection"] = 1;
+                        break;
+                    }
+
+                    else if (ccyrow["CURRENCY_PAIR_2"].ToString().Contains(DevonPair))
+                    {
+                        row["RateDirection"] = 2;
+                        break;
+                    }
+                }
+
+                // Add DataRow to DataTable
                 table.Rows.Add(row);
-
             }
-            
+
             return table;
         }
 
