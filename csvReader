@@ -26,13 +26,17 @@ namespace CSVFileParser
                 // Create Devon Table based on cost rate
                 DataTable DevonTable = CreateDevonTable(HanoiFXData);
                 InspectData(DevonTable);
+
+                // Update job status after conversion
+                string convSuccess = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: File is converted successfully.";
+                SuccessLog(FilePath, convSuccess);
             }
 
             catch (Exception e)
             {
                 // Update job status for errors
-                string importError = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: " + e.Message;
-                ErrorLog(FilePath, importError);
+                string Error = "Runtime: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Status: " + e.Message;
+                ErrorLog(FilePath, Error);
             }
             Console.ReadLine();
         }
@@ -59,7 +63,16 @@ namespace CSVFileParser
 
                     for (int i = 0; i < headers.Length; i++)
                     {
-                        row[i] = rows[i];
+                        if (i == 53) // Column number for VALUE_DATE
+                        {
+                            row[i] = DateTime.Parse((rows[i].ToString())).ToString("yyyyMMdd");
+                        }
+                        
+                        else
+                        {
+                            row[i] = rows[i];
+                        }
+                        
                     }
                     table.Rows.Add(row);
                 }
@@ -84,7 +97,7 @@ namespace CSVFileParser
                 new DataColumn("DealType",                  typeof(Int32)),
                 new DataColumn("Currency1",                 typeof(String)),
                 new DataColumn("DealVolumeCurrency1",       typeof(Double)),
-                new DataColumn("ValueDatePeriod1Currency1", typeof(DateTime)),
+                new DataColumn("ValueDatePeriod1Currency1", typeof(String)),
                 new DataColumn("LocalTCID",                 typeof(String)),
                 new DataColumn("TradingArea",               typeof(String)),
                 new DataColumn("UserDefinedData1",          typeof(String)),
@@ -131,11 +144,27 @@ namespace CSVFileParser
                 }
 
                 // (8)  Currency1
-
+                if (srcrow["FIX_CONTRACT_EQUIVALENT_FLAG"].ToString().Contains("C"))
+                {
+                    row["Currency1"] = srcrow["CONTRACT_CURRENCY"];
+                }
+                else if (srcrow["FIX_CONTRACT_EQUIVALENT_FLAG"].ToString().Contains("E"))
+                {
+                    row["Currency1"] = srcrow["EQUIVALENT_CURRENCY"];
+                }
 
                 // (9)  DealVolumeCurrency1
+                if (srcrow["FIX_CONTRACT_EQUIVALENT_FLAG"].ToString().Contains("C"))
+                {
+                    row["DealVolumeCurrency1"] = srcrow["CONTRACT_AMOUNT"];
+                }
+                else if (srcrow["FIX_CONTRACT_EQUIVALENT_FLAG"].ToString().Contains("E"))
+                {
+                    row["DealVolumeCurrency1"] = srcrow["EQUIVALENT_AMOUNT"];
+                }
 
                 // (10) ValueDatePeriod1Currency1  
+                row["ValueDatePeriod1Currency1"] = srcrow["VALUE_DATE"];
 
                 // (11) LocalTCID 
                 row["LocalTCID"] = "MHCBSPO";
@@ -153,10 +182,18 @@ namespace CSVFileParser
                 // (13) UserDefinedData1
                 row["UserDefinedData1"] = "C1BHAN1";
 
-                // (14) userDefinedData5 
+                // (14) UserDefinedData5 
                 row["UserDefinedData5"] = "DUMMY";
 
                 // (15) Currency2
+                if (srcrow["FIX_CONTRACT_EQUIVALENT_FLAG"].ToString().Contains("C"))
+                {
+                    row["Currency2"] = srcrow["EQUIVALENT_CURRENCY"];
+                }
+                else if (srcrow["FIX_CONTRACT_EQUIVALENT_FLAG"].ToString().Contains("E"))
+                {
+                    row["Currency2"] = srcrow["CONTRACT_CURRENCY"];
+                }
 
                 // (16) ExchangeRatePeriod1 
                 if (string.IsNullOrEmpty(srcrow["INTERNAL_RATE"].ToString()))
