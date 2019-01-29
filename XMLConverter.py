@@ -6,9 +6,10 @@ import xml.etree.ElementTree as ET
 ## Initiate variables ##
 deals = []
 
-## Create a Message node ##
+## Initiate a Message node ##
 msg = ET.Element('Message')
 msg.text = '\n'
+tree = ET.ElementTree(msg)
 
 ## Save current trading day's log file as XML ##
 filename = 'LBN_' + str(datetime.datetime.now().strftime('%Y%m%d'))
@@ -17,6 +18,12 @@ with open(filename + '.log', 'r') as logFile:
     for line in lines:   
         if re.search(r'<gid_message type="DO1">', line):
             deals.append(re.search(r'<data.*\/data>', line).group())
+            #deals += '\n' + re.search(r'<data.*\/data>', line).group() 
+
+fragment = '\n'.join([deal for deal in deals])
+deal = ET.fromstring('<root>' + fragment + '</root>')
+msg.append(deal)
+tree.write('output.xml')
 
 
 """
