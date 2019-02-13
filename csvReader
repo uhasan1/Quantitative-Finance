@@ -1,24 +1,4 @@
-https://analystcave.com/vba-xml-working-xml-files/
-Sub TestXML()
-    Dim XDoc As Object
-     
-    Set XDoc = CreateObject("MSXML2.DOMDocument")
-    XDoc.async = False: XDoc.validateOnParse = False
-    XDoc.Load (ThisWorkbook.Path & "\test.xml")
-     
-    'Get Document Elements
-    Set lists = XDoc.DocumentElement
-     
-    'Traverse all elements 2 branches deep
-    For Each listNode In lists.ChildNodes
-        Debug.Print "---Email---"
-        For Each fieldNode In listNode.ChildNodes
-            Debug.Print "[" & fieldNode.BaseName & "] = [" & fieldNode.Text & "]"
-        Next fieldNode
-    Next listNode
-     
-    Set XDoc = Nothing
-End Sub
+https://stackoverflow.com/questions/28507073/vbscript-loop-through-all-text-files-in-a-folder-delete-the-first-and-last-lin
 
 
 using System;
