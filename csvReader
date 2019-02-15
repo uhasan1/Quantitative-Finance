@@ -1,5 +1,13 @@
-https://stackoverflow.com/questions/28507073/vbscript-loop-through-all-text-files-in-a-folder-delete-the-first-and-last-lin
+https://www.analyticsvidhya.com/blog/2018/02/the-different-methods-deal-text-data-predictive-python/
 
+## Count top 10 common words ## 
+freq = pd.Series(' '.join(train['tweet']).split()).value_counts()[:10]
+
+## Removal of stop words ##
+from nltk.corpus import stopwords
+stop = stopwords.words('english')
+train['tweet'] = train['tweet'].apply(lambda x: " ".join(x for x in x.split() if x not in stop))
+train['tweet'].head()
 
 using System;
 using System.IO;
