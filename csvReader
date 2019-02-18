@@ -1,13 +1,37 @@
 https://www.analyticsvidhya.com/blog/2018/02/the-different-methods-deal-text-data-predictive-python/
 
-## Count top 10 common words ## 
-freq = pd.Series(' '.join(train['tweet']).split()).value_counts()[:10]
-
-## Removal of stop words ##
+## Import Python libraries ##
 from nltk.corpus import stopwords
-stop = stopwords.words('english')
-train['tweet'] = train['tweet'].apply(lambda x: " ".join(x for x in x.split() if x not in stop))
-train['tweet'].head()
+import pandas as pd
+import re
+
+## Import sample test file ##
+df_ = pd.read_excel('test.xlsx')
+
+## Concatenate REMITTANCE_INFORMATION and SENDER_TO_RECEIVER_INFORMATION columns ##
+remit_purpose = pd.concat([df_['REMITTANCE_INFORMATION'], df_['SENDER_TO_RECEIVER_INFORMATION']], ignore_index = True)
+
+## Drop empty rows in remit_purpose ##
+remit_purpose.dropna(inplace = True)
+
+## Remove stopwords from remit_purpose ##
+stopWords = set(stopwords.words('english'))
+remit_purpose = remit_purpose.apply(lambda x: ' '.join(x for x in x.split() if x.lower() not in stopWords))
+
+## Remove non-alphanumeric characters and numbers from remit_purpose ##
+remit_purpose = remit_purpose.str.replace(r'[^\w\s]', ' ') 
+remit_purpose = remit_purpose.str.replace(r'\d+', ' ')
+remit_purpose = remit_purpose.str.strip()
+
+## Identify potential keywords in remit_purpose ##
+cap_inject = remit_purpose.apply(lambda x: ' '.join(x for x in x.split() if re.findall('CAP|INJ|DIV', x.upper())))
+
+## Display each word's frequency in DataFrame ## --> Display samples of cap_inject
+count = pd.Series(' '.join(cap_inject).split()).value_counts()
+df = pd.DataFrame({'Frequency': count}).reset_index()
+df.columns = ['KEYWORDS', 'FREQUENCY']
+df.index += 1
+print(df)
 
 using System;
 using System.IO;
