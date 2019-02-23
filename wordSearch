@@ -42,3 +42,5 @@ def get_targettext(notes):
    
 
 remit_purpose.apply(lambda x: get_targettext(x))
+df['COUNT'] = ""
+df_ = df.groupby('KEYWORDS')['COUNT'].count()
