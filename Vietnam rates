@@ -1,0 +1,55 @@
+## Import Python libraries ## 
+from bs4 import BeautifulSoup
+import datetime as dt
+import matplotlib.pyplot as plt
+%matplotlib inline
+import numpy as np
+import pandas as pd
+import re
+import urllib3
+
+## Initialize variables ##
+fx_urls = ['https://www.sbv.gov.vn/webcenter/portal/en/home/rm/er',
+           'https://www.vietcombank.com.vn/ExchangeRates/?lang=en',
+           'https://www.vietinbank.vn/web/home/en/doc/saving/exrate.html',
+           'https://www.bidv.com.vn/en/ty-gia-ngoai-te',
+           'http://www.agribank.com.vn/LayOut/Pages/TyGiaPopUp.aspx?date='] #date is in dd/mm/yy format &lang=2
+
+depo_urls = ['https://www.vietcombank.com.vn/InterestRates/?lang=en',
+             'https://www.vietinbank.vn/web/home/en/doc/saving',
+             'https://www.bidv.com.vn/ServicesBIDV/InterestDetailServlet',
+             'http://www.agribank.com.vn/LayOut/Pages/LaiSuatDetail.aspx?lang=2']
+
+fx_rates = []
+fx_dates = []
+
+depo_dict = {'Vietcombank': 'empty',
+             'Vietinbank': 'empty',
+             'BIDV': 'empty',
+             'Agribank': 'empty'}
+             
+## Access website contents to capture 12-month rates ##
+for url in depo_urls:
+    ## If url is BIDV, using beautifulsoup to capture 12-month deposit rates ##
+    if 'bidv' in url:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        request = urllib3.PoolManager().request('GET', url)
+        soup = BeautifulSoup(request.data)
+        dataHN = re.search(r'["]\b12 months\b["][,]["]\bVND\b["][:]["]\d[.]\d["]', soup.p.text.split('hanoi')[1]).group(0)
+        depo_dict.update(BIDV = float(re.search(r'\d[.]\d', dataHN).group(0)))
+    ## If url is not BIDV, use pandas.read_html to capture 12-months deposit rates ##
+    else:
+        table = pd.read_html(url, header = 0)[0]
+        if 'vietcombank' in url:
+            table.drop_duplicates(subset = ['Kỳ hạn'], inplace = True)
+            table.dropna(inplace = True)
+            table.set_index(['Kỳ hạn'], inplace = True)
+            depo_dict.update(Vietcombank = float(table.loc['12 tháng']['VND'].split()[0]))
+        elif 'vietinbank' in url:
+            table.columns = ['Term', 'Individuals_VND', 'Online_Saving_VND', 'Individuals_USD', 'Individuals_EUR']
+            table = table[2:]
+            table.set_index(['Term'], inplace = True)
+            depo_dict.update(Vietinbank = float(table.loc['12 months']['Individuals_VND']))
+        elif 'agribank' in url:
+            table.set_index(['Currency', 'Forms of mobilization', 'Term'], inplace = True)
+            depo_dict.update(Agribank = float(table.loc['VND', 'Savings', '12 months']['Interest rate'].split()[0]))
