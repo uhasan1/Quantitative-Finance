@@ -62,3 +62,15 @@ df_inj.to_excel(writer, sheet_name = 'INJECTION', index = False)
 df_div.to_excel(writer, sheet_name = 'DIVIDEND', index = False)
 df_loan.to_excel(writer, sheet_name = 'LOAN', index = False)
 writer.save()
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+request = urllib3.PoolManager().request('GET', fx_urls[0])
+soup = BeautifulSoup(request.data, 'lxml')
+contents = soup.find_all('tbody')
+for content in contents:
+    data = content.find_all('span')
+    #print(data)
+    for innertext in data:
+        if 'quoted the central rate' in innertext.text:
+            break
+    print(' '.join([innertext.text for innertext in data]))
