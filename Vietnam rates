@@ -53,3 +53,12 @@ for url in depo_urls:
         elif 'agribank' in url:
             table.set_index(['Currency', 'Forms of mobilization', 'Term'], inplace = True)
             depo_dict.update(Agribank = float(table.loc['VND', 'Savings', '12 months']['Interest rate'].split()[0]))
+
+
+## Download DataFrames into Excel ##
+writer = pd.ExcelWriter('wordSearch.xlsx')
+df_cap.to_excel(writer, sheet_name = 'CAPITAL', index = False)
+df_inj.to_excel(writer, sheet_name = 'INJECTION', index = False)
+df_div.to_excel(writer, sheet_name = 'DIVIDEND', index = False)
+df_loan.to_excel(writer, sheet_name = 'LOAN', index = False)
+writer.save()
