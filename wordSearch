@@ -1,3 +1,15 @@
+(1) Can launch Google Chrome and type VITAL login page.
+(2) Right click on the screen and select 'Inspect'
+(3) Select one of the actions under 'Name'
+(4) Select 'Header' tab to review the cookies
+
+# Note requests version is 2.18.4
+import requests
+session = requests.Session()
+jar = requests.cookies.RequestsCookieJar()
+jar.set('set your own cookie jar based on inputs in (4))
+session.cookies = jar
+r = session.get(url)
 https://www.analyticsvidhya.com/blog/2018/02/the-different-methods-deal-text-data-predictive-python/
 
 ## Import Python libraries ##
