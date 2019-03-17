@@ -1,12 +1,11 @@
 ## Import Python libraries ## 
 from bs4 import BeautifulSoup
 import datetime as dt
-import matplotlib.pyplot as plt
-%matplotlib inline
 import numpy as np
 import pandas as pd
 import re
-import urllib3
+import requests
+from selenium import webdriver
 
 ## Initialize variables ##
 fx_urls = ['https://www.sbv.gov.vn/webcenter/portal/en/home/rm/er',
@@ -17,60 +16,172 @@ fx_urls = ['https://www.sbv.gov.vn/webcenter/portal/en/home/rm/er',
 
 depo_urls = ['https://www.vietcombank.com.vn/InterestRates/?lang=en',
              'https://www.vietinbank.vn/web/home/en/doc/saving',
-             'https://www.bidv.com.vn/ServicesBIDV/InterestDetailServlet',
-             'http://www.agribank.com.vn/LayOut/Pages/LaiSuatDetail.aspx?lang=2']
+             'https://www.bidv.com.vn/en/tra-cuu-lai-suat',
+             'http://agribank.com.vn/LayOut/Pages/LaiSuatDetail.aspx?lang=2&strFilter=1,1']
 
-fx_rates = []
-fx_dates = []
+central_rates = {'CENTRAL_RATES': [], 'CUTOFF_MMDDYYYY': []}
+fx_dict = {'BANKS': ['SBV', 'Vietcombank', 'Vietinbank', 'BIDV', 'Agribank'], 'FX_TRAN_RATES': [], 'FX_SELL_RATES': [], 'CUTOFF_MMDDYYYY': []}
+depo_dict = {'BANKS': ['Vietcombank', 'Vietinbank', 'BIDV', 'Agribank'], '12M_DEPO_RATES': []}
 
-depo_dict = {'Vietcombank': 'empty',
-             'Vietinbank': 'empty',
-             'BIDV': 'empty',
-             'Agribank': 'empty'}
+## Get SBV Central Bank rates ## 
+# Use PhantomJS to run Javascript website #
+driver = webdriver.PhantomJS(executable_path=r'C:\Users\r15\phantomjs-2.1.1-windows\bin\phantomjs.exe')
+driver.get(fx_urls[0])
+# Load request and cook the soup #
+soup = BeautifulSoup(driver.page_source, 'html.parser')
+# Scoop up the first table and associated rows from soup #
+table = soup.find_all(class_ = 'jrPage')[0]
+datarows = table.find_all(style = 'height:30px')
+# Obtain the central rate and date found in rows #
+for datarow in datarows:
+    if re.search(r'\d+\s[?=VND]', datarow.get_text()):
+        central_rates['CENTRAL_RATES'] = ['{0:,.2f}'.format(int(datarow.get_text().split()[3].replace(',', '')))]
+    if re.search(r'\d+[/]\d+[/]\d+', datarow.get_text()):
+        central_rates['CUTOFF_MMDDYYYY'] = [datarow.get_text().split()[3]]
+driver.close()
+#print(central_rates)
+
+## Get USD-VND exchange rates from all banks ##
+
+# Load request for each url in order and cook the soup accordingly #
+for url in fx_urls:
+    
+    # Initiate procedures depending on url #
+    if 'sbv' in url:
+        # Use PhantomJS to run Javascript website #
+        driver = webdriver.PhantomJS(executable_path=r'C:\Users\r15\phantomjs-2.1.1-windows\bin\phantomjs.exe')
+        driver.get(url)
+        # Scoop up the second table and associated rows from soup #
+        print('Extracting SBV FX rates. Please wait!')
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        table = soup.find_all(class_ = 'jrPage')[1]
+        datarows = table.find_all('tr')
+        # Obtain the fx exchange rates and date found in rows #
+        for datarow in datarows:
+            if re.search(r'\d+[/]\d+[/]\d+', datarow.get_text()):
+                fx_dict['CUTOFF_MMDDYYYY'] = [re.search(r'\d+[/]\d+[/]\d+', datarow.get_text()).group(0)]
+            if re.search(r'\bUSD\b', datarow.get_text()):
+                fx_dict['FX_TRAN_RATES'] = ['{0:,.2f}'.format(int(datarow.get_text().split()[-2].replace(',', '')))]
+                fx_dict['FX_SELL_RATES'] = ['{0:,.2f}'.format(int(datarow.get_text().split()[-1].replace(',', '')))]
+        driver.close()
+        
+    elif 'vietcombank' in url:
+        # Send request to website #
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # Scoop up all the paragraphs and obtain the date #
+        print('Extracting Vietcombank FX rates. Please wait!')
+        paragraphs = soup.find_all('p')
+        for paragraph in paragraphs:
+            if re.search(r'\d+[/]\d+[/]\d+', paragraph.get_text()):
+                date = re.search(r'\d+[/]\d+[/]\d+', paragraph.get_text()).group(0)
+                date = date.split("/")[1] + "/" + date.split("/")[0] + "/" + date.split("/")[2]
+                fx_dict['CUTOFF_MMDDYYYY'].append(date)
+                break
+        # Scoop up the first table and associated rows using pandas read_html #
+        table = pd.read_html(url, header = 0, index_col = [0])[0]
+        # Obtain the fx exchange rates found in table #
+        fx_dict["FX_TRAN_RATES"].append('{0:,.2f}'.format(table.loc['USD','Transfer']))
+        fx_dict["FX_SELL_RATES"].append('{0:,.2f}'.format(table.loc['USD','Sell']))
+   
+    elif 'vietinbank' in url:
+        # Send request to website #
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # Scoop up the first table and obtain the date #
+        print('Extracting Vietinbank FX rates. Please wait!')
+        table = soup.find_all('table')[0]
+        datarow = table.find_all('tr')[0]
+        if re.search(r'\d+[/]\d+[/]\d+', datarow.get_text()):
+                fx_dict['CUTOFF_MMDDYYYY'].append(re.search(r'\d+[/]\d+[/]\d+', datarow.get_text()).group(0))
+        # Scoop up the second table and associated rows using pandas read_html #
+        table = pd.read_html(url, header = 0, skiprows = [1])[1]
+        # Reformat table columns and set currency as index #
+        table.columns = ['CURRENCY', 'CENTRAL_RATE', 'BUY_CC', 'TRAN', 'SELL']
+        table.set_index(['CURRENCY'], inplace = True)
+        # Obtain the fx exchange rates found in table #
+        fx_dict["FX_TRAN_RATES"].append('{0:,.2f}'.format(int(table.loc['USD','TRAN'].split('.')[0])))
+        fx_dict["FX_SELL_RATES"].append('{0:,.2f}'.format(int(table.loc['USD','SELL'].split('.')[0])))
+
+    elif 'bidv' in url:
+        # Use PhantomJS to run Javascript website #
+        driver = webdriver.PhantomJS(executable_path=r'C:\Users\r15\phantomjs-2.1.1-windows\bin\phantomjs.exe')
+        driver.get(url)
+        # Scoop up the first table and associated rows using pandas read_html #
+        print('Extracting BIDV FX rates. Please wait!')
+        table = pd.read_html(driver.page_source, header=0, index_col = [0])[0]
+        # Reformat table's index and columns #
+        table.index = table.index.str.replace('Currency', '')
+        table['Buy'] = table['Buy'].str.replace('Buy', '')
+        table['Transfer'] = table['Transfer'].str.replace('Transfer', '')
+        table['Sell'] = table['Sell'].str.replace('Sell', '')
+        del table['Currency name']
+        # Obtain the rates and dates found in table #
+        fx_dict['FX_TRAN_RATES'].append('{0:,.2f}'.format(int(table.loc['USD', 'Transfer'].replace(',', ''))))
+        fx_dict['FX_SELL_RATES'].append('{0:,.2f}'.format(int(table.loc['USD', 'Sell'].replace(',', ''))))
+        fx_dict['CUTOFF_MMDDYYYY'].append(dt.datetime.now().strftime('%m/%d/%Y'))
+        driver.close()
+        
+    elif 'agribank' in url:
+        # Send request to website #
+        url = url + dt.datetime.now().strftime('%d/%m/%Y') + '&lang=2'
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # Check whether current day's FX rates have been updated
+        # Generate No Rates if current day's FX rates have not been updated
+        print('Extracting Agribank FX rates. Please wait!')
+        if 'No data' in ' '.join(soup.get_text().split()[-2:]):
+            fx_dict['FX_TRAN_RATES'].append('Rates are not in')
+            fx_dict['FX_SELL_RATES'].append('Rates are not in')
+            fx_dict['CUTOFF_MMDDYYYY'].append('Rates are not in')
+        else:
+            # Scoop first table and associated rows using pandas read_html if current day's FX rates have been updated
+            table = pd.read_html(url, header = 0, index_col = [0])[0]
+            # Obtain the fx exchange rates and date found in rows #
+            fx_dict['FX_TRAN_RATES'].append('{0:,.2f}'.format(table.loc['USD', 'Transfer']))
+            fx_dict['FX_SELL_RATES'].append('{0:,.2f}'.format(table.loc['USD', 'Sell']))
+            fx_dict['CUTOFF_MMDDYYYY'].append(dt.datetime.now().strftime('%m/%d/%Y'))
              
-## Access website contents to capture 12-month rates ##
+#print(fx_dict)
+
+## Get 12-month deposit rates from all banks ##
+
+# Load request for each url in order and cook the soup accordingly #
 for url in depo_urls:
-    ## If url is BIDV, using beautifulsoup to capture 12-month deposit rates ##
-    if 'bidv' in url:
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        request = urllib3.PoolManager().request('GET', url)
-        soup = BeautifulSoup(request.data)
-        dataHN = re.search(r'["]\b12 months\b["][,]["]\bVND\b["][:]["]\d[.]\d["]', soup.p.text.split('hanoi')[1]).group(0)
-        depo_dict.update(BIDV = float(re.search(r'\d[.]\d', dataHN).group(0)))
-    ## If url is not BIDV, use pandas.read_html to capture 12-months deposit rates ##
-    else:
+    
+    # Initiate procedures depending on url #    
+    if 'vietcombank' in url:
+        # Scoop up the first table and associated rows using pandas read_html #
+        print('Extracting Vietcombank deposit rates. Please wait!')
+        table = pd.read_html(url, header = 0, index_col = [0], skiprows = [i for i in np.arange(1, 16)])[0]
+        # Obtain the deposit rates found in table #
+        depo_dict['12M_DEPO_RATES'] = [table.loc['12 tháng', 'VND'].split()[0]]
+        
+    elif 'vietinbank' in url:
+        # Scoop up the first table and associated rows using pandas read_html #
+        print('Extracting Vietinbank deposit rates. Please wait!')
+        table = pd.read_html(url, header = 0, index_col = [0], skiprows = [i for i in np.arange(1, 3)])[0]
+        # Reformat the table columns #
+        table.columns = ['VND_Individuals', 'VND_Online', 'USD_Individuals', 'EUR_Individuals']
+        # Obtain the deposit rates found in table #
+        depo_dict['12M_DEPO_RATES'].append('{0:.2f}'.format(table.loc['12 months', 'VND_Individuals']))
+   
+    elif 'bidv' in url:
+        # Use PhantomJS to run Javascript website #
+        driver = webdriver.PhantomJS(executable_path=r'C:\Users\r15\phantomjs-2.1.1-windows\bin\phantomjs.exe')
+        driver.get(url)
+        # Scoop up the first table and associated rows using pandas read_html #
+        print('Extracting BIDV deposit rates. Please wait!')
+        table = pd.read_html(driver.page_source, header = 0, index_col = [1])[0]
+        # Obtain the deposit rates found in table #
+        depo_dict['12M_DEPO_RATES'].append('{0:.2f}'.format(float(table.loc['12 months', 'VND'].split('%')[0])))
+        driver.close()
+    
+    elif 'agribank' in url:
+         # Scoop up the first table and associated rows using pandas read_html #
+        print('Extracting Agribank deposit rates. Please wait!')
         table = pd.read_html(url, header = 0)[0]
-        if 'vietcombank' in url:
-            table.drop_duplicates(subset = ['Kỳ hạn'], inplace = True)
-            table.dropna(inplace = True)
-            table.set_index(['Kỳ hạn'], inplace = True)
-            depo_dict.update(Vietcombank = float(table.loc['12 tháng']['VND'].split()[0]))
-        elif 'vietinbank' in url:
-            table.columns = ['Term', 'Individuals_VND', 'Online_Saving_VND', 'Individuals_USD', 'Individuals_EUR']
-            table = table[2:]
-            table.set_index(['Term'], inplace = True)
-            depo_dict.update(Vietinbank = float(table.loc['12 months']['Individuals_VND']))
-        elif 'agribank' in url:
-            table.set_index(['Currency', 'Forms of mobilization', 'Term'], inplace = True)
-            depo_dict.update(Agribank = float(table.loc['VND', 'Savings', '12 months']['Interest rate'].split()[0]))
+        # Obtain the deposit rates found in table #
+        depo_dict['12M_DEPO_RATES'].append(table['Interest rate'][(table['Currency'] == 'VND') & (table['Term'] == '12 months')].iloc[0].split()[0])
 
-
-## Download DataFrames into Excel ##
-writer = pd.ExcelWriter('wordSearch.xlsx')
-df_cap.to_excel(writer, sheet_name = 'CAPITAL', index = False)
-df_inj.to_excel(writer, sheet_name = 'INJECTION', index = False)
-df_div.to_excel(writer, sheet_name = 'DIVIDEND', index = False)
-df_loan.to_excel(writer, sheet_name = 'LOAN', index = False)
-writer.save()
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-request = urllib3.PoolManager().request('GET', fx_urls[0])
-soup = BeautifulSoup(request.data, 'lxml')
-contents = soup.find_all('tbody')
-for content in contents:
-    data = content.find_all('span')
-    #print(data)
-    for innertext in data:
-        if 'quoted the central rate' in innertext.text:
-            break
-    print(' '.join([innertext.text for innertext in data]))
+#print(depo_dict)
