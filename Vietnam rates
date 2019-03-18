@@ -86,7 +86,7 @@ for url in fx_urls:
    
     elif 'vietinbank' in url:
         # Send request to website #
-        response = requests.get(url)
+        response = requests.get(url, verify = False)
         soup = BeautifulSoup(response.text, 'html.parser')
         # Scoop up the first table and obtain the date #
         print('Extracting Vietinbank FX rates. Please wait!')
