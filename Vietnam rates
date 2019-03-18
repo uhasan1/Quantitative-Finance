@@ -185,3 +185,22 @@ for url in depo_urls:
         depo_dict['12M_DEPO_RATES'].append(table['Interest rate'][(table['Currency'] == 'VND') & (table['Term'] == '12 months')].iloc[0].split()[0])
 
 #print(depo_dict)
+
+
+
+## Import Python libraries ##
+import datetime as dt
+from tabula import read_pdf
+
+## Import dataset from url's pdf ##
+date = (dt.datetime.now() - dt.timedelta(days=2)).strftime('%Y%m%d')
+#date = dt.datetime.now().strftime('%Y%m%d')
+url = 'https://owa.hnx.vn/ftp///THONGKEGIAODICH//' + date + '/TP/' + date + '_TP_Repos_statistics_by_repos_term.pdf'
+table = read_pdf(url)
+
+## Format table columns ##
+table.set_index(table['No.'], inplace = True)
+del table['No.'], table['Repos term (days)']
+table.columns = ['Repos term (days)', 'Bond type', 'Trading volume', 'Value of first settlement', 'Interest range (%/year)']
+table = table[:-1]
+table.to_excel(str(date) + '_HNX.xlsx')
