@@ -75,4 +75,12 @@ Next i
 End Sub
 
 
+driver = webdriver.PhantomJS(executable_path=r'C:\Users\r15\phantomjs-2.1.1-windows\bin\phantomjs.exe')
+driver.get('https://duckduckgo.com')
+driver.find_element_by_id('search_form_input_homepage')
+driver.sendKeys('python')
+driver.save_screenshot('1.png')
+#elem.send_keys(Keys.RETURN)
+#driver.find_element_by_id('search_button_homepage').click()
 
+driver.close()
