@@ -1,0 +1,8 @@
+## Notes 
+
+# Tableau Prep
+Tableau Prep allows user to clean/transform the dirty data and perform necessary joins with other datasets.
+Once the transformation is complete, we can output the results into a file and store it in local. Alternatively, it can also be stored in Tableau server. 
+
+# Tableau Desktop
+Tableau Desktop could perform some ETLs and perform the necessary visualizations after the ETL is complete.  
