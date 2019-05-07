@@ -1,0 +1,70 @@
+# Metadata for Government Procurement
+---
+Identifier: '085dd6c3-387b-4661-ab26-02e422ad1286'
+Name: 'government-procurement'
+Title: 'Government Procurement'
+Description: 'This dataset lists all open tenders put out by government agencies since
+  2015.'
+Topics:
+  - 'Finance'
+Keywords:
+  - 'GeBIZ'
+  - 'procurement'
+Publisher:
+  Name: 'Ministry of Finance'
+  Admin 1:
+    Name: 'Charles Tan'
+    Department: 'Performance & Resource Management'
+    Email: 'Charles_TAN@mof.gov.sg'
+Sources:
+  - 'Ministry of Finance'
+License: 'https://data.gov.sg/open-data-licence'
+Frequency: 'Monthly'
+Coverage: '2015-01-02 to 2017-01-31'
+Last Updated: '2017-02-16T09:09:51.650638'
+Resources:
+  -
+    Identifier: 'b9d8d509-5cb6-45dc-bb46-9508e670e3c2'
+    Title: 'Government Procurement via GeBIZ'
+    Url: 'https://storage.data.gov.sg/government-procurement/resources/government-procurement-via-gebiz-2016-11-22T11-45-37Z.csv'
+    Format: 'CSV'
+    Coverage: '2015-01-02 to 2017-01-31'
+    Last Updated: '2016-11-22T11:45:37.105036'
+    Schema:
+      -
+        Name: 'tender_no.'
+        Title: 'Tender No.'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'agency'
+        Title: 'Agency'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'tender_description'
+        Title: 'Tender Description'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'award_date'
+        Title: 'Award Date'
+        Type: 'datetime'
+        Sub Type: 'date'
+        Format: 'YYYY-MM-DD'
+      -
+        Name: 'tender_detail_status'
+        Title: 'Tender Detail Status'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'supplier_name'
+        Title: 'Supplier Name'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'awarded_amt'
+        Title: 'Awarded Amount'
+        Type: 'numeric'
+        Sub Type: 'general'
+        Unit Of Measure: 'S$'

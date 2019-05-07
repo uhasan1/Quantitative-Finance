@@ -1,0 +1,130 @@
+# Metadata for Air Passenger Arrivals - Total by Region and Selected Country of Embarkation
+---
+Identifier: '4a83d585-2399-4c00-9caa-dff61a115de5'
+Name: 'air-passenger-arrivals-total-by-region-and-selected-country-of-embarkation'
+Title: 'Air Passenger Arrivals - Total by Region and Selected Country of Embarkation'
+Description:
+  - 'Air Passenger Arrivals by Region and selected country of embarkation.'
+  - ''
+  - 'Refers to Changi Airport only.  Data exclude transit passengers who continued
+    their journey on the same flight.  Figures from January 1989 refer to Changi Airport
+    only.'
+  - ''
+  - 'GERMANY - Data prior to January 1991 refers to Federal Republic of Germany only.'
+Topics:
+  - 'Transport'
+Keywords:
+  - 'Changi Airport'
+  - 'International Travel'
+Publisher:
+  Name: 'Civil Aviation Authority of Singapore'
+  Admin 1:
+    Name: 'Ng Bo Lin'
+    Department: 'Civil Aviation Authority of Singapore'
+    Email: 'ng_bo_lin@caas.gov.sg'
+  Admin 2:
+    Name: 'Amaliah Hamsah'
+    Department: 'Civil Aviation Authority of Singapore'
+    Email: 'Amaliah_HAMSAH@caas.gov.sg'
+Sources:
+  - 'Civil Aviation Authority of Singapore'
+Source Url: 'http://www.tablebuilder.singstat.gov.sg/publicfacing/createDataTable.action?refId=2006'
+License: 'https://data.gov.sg/open-data-licence'
+Frequency: 'Monthly'
+Coverage: '1961-01-01 to 2017-03-31'
+Last Updated: '2017-05-26T16:01:54.833248'
+Resources:
+  -
+    Identifier: '93b737b7-1f4d-4250-868a-11d1d649c12a'
+    Title: 'Air Passenger Arrivals - Total'
+    Url: 'https://storage.data.gov.sg/air-passenger-arrivals-total-by-region-and-selected-country-of-embarkation/resources/air-passenger-arrivals-total-2017-05-26T16-01-24Z.csv'
+    Format: 'CSV'
+    Coverage: '1961-01-01 to 2017-03-31'
+    Last Updated: '2017-05-26T16:01:24.352818'
+    Schema:
+      -
+        Name: 'month'
+        Title: 'Month'
+        Type: 'datetime'
+        Sub Type: 'month'
+        Format: 'YYYY-MM'
+      -
+        Name: 'level_1'
+        Title: 'Total'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'value'
+        Title: 'Value'
+        Type: 'numeric'
+        Sub Type: 'general'
+        Unit Of Measure: 'Total'
+  -
+    Identifier: '797eb76c-8691-4016-a80b-49e4f8a30f82'
+    Title: 'Air Passenger Arrivals - By Region'
+    Url: 'https://storage.data.gov.sg/air-passenger-arrivals-total-by-region-and-selected-country-of-embarkation/resources/air-passenger-arrivals-by-region-2017-05-26T16-01-38Z.csv'
+    Format: 'CSV'
+    Coverage: '1961-01-01 to 2017-03-31'
+    Last Updated: '2017-05-26T16:01:38.432290'
+    Schema:
+      -
+        Name: 'month'
+        Title: 'Month'
+        Type: 'datetime'
+        Sub Type: 'month'
+        Format: 'YYYY-MM'
+      -
+        Name: 'level_1'
+        Title: 'Total'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'level_2'
+        Title: 'Region'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'value'
+        Title: 'Value'
+        Type: 'numeric'
+        Sub Type: 'general'
+        Unit Of Measure: 'Total'
+        Description: '"na" : Data not available.'
+  -
+    Identifier: '58d8777e-a6f7-4e21-8923-09ca57f69ba0'
+    Title: 'Air Passenger Arrivals - By Country of Embarkation'
+    Url: 'https://storage.data.gov.sg/air-passenger-arrivals-total-by-region-and-selected-country-of-embarkation/resources/air-passenger-arrivals-by-country-of-embarkation-2017-05-26T16-01-54Z.csv'
+    Format: 'CSV'
+    Coverage: '1961-01-01 to 2017-03-31'
+    Last Updated: '2017-05-26T16:01:54.512732'
+    Schema:
+      -
+        Name: 'month'
+        Title: 'Month'
+        Type: 'datetime'
+        Sub Type: 'month'
+        Format: 'YYYY-MM'
+      -
+        Name: 'level_1'
+        Title: 'Total'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'level_2'
+        Title: 'Region'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'level_3'
+        Title: 'Country'
+        Type: 'text'
+        Sub Type: 'general'
+      -
+        Name: 'value'
+        Title: 'Value'
+        Type: 'numeric'
+        Sub Type: 'general'
+        Unit Of Measure: 'Total'
+        Description:
+          - '"na" : Data not available.'
+          - '"-" : Data not available.'
