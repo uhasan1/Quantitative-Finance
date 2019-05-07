@@ -1,0 +1,53 @@
+## Note: Please execute the following codes in Quantopian Notebook ... ##
+## ... They would not work on local machine, since the pipeline and research libraries could not be downloaded. ##
+
+## Import Python libraries ##
+import datetime as dt
+import pandas as pd
+from quantopian.pipeline import Pipeline
+from quantopian.pipeline.data.morningstar import Fundamentals
+from quantopian.research import run_pipeline
+
+## Construct factors that simply retrieve the most recent values ##
+listed_exchange = Fundamentals.exchange_id.latest
+share_type = Fundamentals.security_type.latest
+share_class = Fundamentals.share_class_description.latest
+share_class_status = Fundamentals.share_class_status.latest
+share_symbol = Fundamentals.symbol.latest
+
+## Add the factor to the pipeline ##
+pipe = Pipeline(columns={'EXCHANGE': listed_exchange,
+                         'SHARE_TYPE': share_type,
+                         'SHARE_CLASS': share_class,
+                         'SHARE_CLASS_STATUS': share_class_status,
+                         'SHARE_SYMBOL': share_symbol})
+
+## Run the pipeline for today and print the results ##
+if int(dt.datetime.now().strftime('%H')) < 7:
+    df = run_pipeline(pipe, 
+                      (dt.datetime.now() + dt.timedelta(-1)).strftime('%Y-%m-%d'), 
+                      (dt.datetime.now() + dt.timedelta(-1)).strftime('%Y-%m-%d'))
+else:
+    df = run_pipeline(pipe, 
+                      dt.datetime.now().strftime('%Y-%m-%d'), 
+                      dt.datetime.now().strftime('%Y-%m-%d'))
+    
+## Rearrange the order of the columns ##
+df = df[['EXCHANGE', 'SHARE_SYMBOL', 'SHARE_TYPE', 'SHARE_CLASS', 'SHARE_CLASS_STATUS']]
+
+## Initialize the variables ##
+start = 0
+end = 0
+
+## Loop through the dataframe to print dataset ##
+for i in range(len(df)):
+    # Loop through the dataframe for every 50 rows and print partial dataset #
+    if i > 0 and i % 50 == 0:
+        end = i
+        display(df[start:end])
+        start = end
+    # Loop through the dataframe for the remaining rows and print partial dataset #
+    elif i == len(df)-1 and i % 50 != 0:
+        display(df[start:i+1])
+
+## The next step is to consider whether we should scrape the results ##
