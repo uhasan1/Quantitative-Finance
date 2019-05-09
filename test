@@ -1,0 +1,4 @@
+from urllib.parse import urlencode
+import requests
+url = 'https://www.marketscreener.com/search/?lien=recherche&mots='
+r = requests.get(url)
