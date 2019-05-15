@@ -106,6 +106,7 @@ import pandas as pd
 import re
 import requests
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 import time
     
 
@@ -148,6 +149,10 @@ def start_homepage(url, login_id, login_pw):
     return browser, total_pages
 
 
+## Disable Javascript and put the program to temporary rest ##
+#def js_sleep():
+    
+
 ## Scrape all companies from Market Screener Home Page ##
 def scrape_homepage(homepage, page_number, database = companies):
     
@@ -158,9 +163,11 @@ def scrape_homepage(homepage, page_number, database = companies):
         #  do nothing #
     elif page_number > 1:
         # If current page_number is not 1, begin the session on the following page #
+        #next_page_button = WebDriverWait(homepage,8).until(EC.element_to_be_clickable((By.LINK_TEXT, str(page_number))))
         next_page_button = homepage.find_element_by_link_text(str(page_number))
         next_page_button.click()
-        time.sleep(8)
+        time.sleep(13)
+        
         # Thereafter, proceed to scrape the list of companies #
         soup = BeautifulSoup(homepage.page_source, 'html.parser')
     else:
@@ -189,6 +196,3 @@ while page_number <= math.ceil(total_pages/50):
     print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
     page_number += 1        
 browser.close()
-
-
-Save geckodriver in C:\Users\C_YEE\AppData\Local\Continuum\anaconda3
