@@ -94,3 +94,101 @@ for ticker in SBSU_ticker_list[1332:1333]:
             for table in tables:
                 if table.find_all('td', {'title': 'Voting rights per share'}):
                     rows = table.find_all('tr')[1:]
+
+
+## Import Python libraries ## 
+from bs4 import BeautifulSoup
+import datetime as dt
+import Levenshtein as lev
+import math
+import numpy as np
+import pandas as pd
+import re
+import requests
+from selenium import webdriver
+import time
+    
+
+## Initialize variables ##
+url_list = ['https://www.marketscreener.com/stock-exchange/shares/',
+            'https://www.marketscreener.com/search/instruments/equities/?aComposeInputSearch=s_']
+filepath = 'C:\\Users\\C_YEE\\Projects\\data' 
+ms_login = {'LOGIN': 'clement.yee@scientificbeta.com', 'PASSWORD': 'Sjiboy88!'}
+companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
+             'MKT_CAP_IN_MILLIONS': [], 'MS_LINKS': [], 'SECURITIES_RIC': []}
+page_number = 1
+
+## Launch Market Screener Home Page with Selenium's webdriver ##
+def start_homepage(url, login_id, login_pw):
+    
+    # Initiate a Firefox browser session #
+    profile = webdriver.FirefoxProfile()
+    profile.set_preference('accessibility.blockautorefresh', True)
+    profile.set_preference('network.http.response.timeout', 10000)
+    browser = webdriver.Firefox(profile)
+    browser.get(url)
+
+    # Set waiting time for loading process #
+    time.sleep(8)
+    
+    # One-time login #
+    login_button = browser.find_element_by_class_name('htLog')
+    login_button.click()
+    email = browser.find_element_by_name('login')
+    email.send_keys(login_id)
+    password = browser.find_element_by_name('password')
+    password.send_keys(login_pw)
+    password.submit()
+    
+    # Set waiting time for loading process #
+    time.sleep(8)
+    
+    soup = BeautifulSoup(browser.page_source, 'html.parser')
+    total_pages = int(soup.find_all('div', {'id': 'div_res_val'})[0].text.replace(' ', ''))
+    return browser, total_pages
+
+
+## Scrape all companies from Market Screener Home Page ##
+def scrape_homepage(homepage, page_number, database = companies):
+    
+    # Check page_number to determine course of action #
+    if page_number == 1:
+        # If current page_number is 1, proceed to scrape the list of companies #
+        soup = BeautifulSoup(homepage.page_source, 'html.parser')
+        #  do nothing #
+    elif page_number > 1:
+        # If current page_number is not 1, begin the session on the following page #
+        next_page_button = homepage.find_element_by_link_text(str(page_number))
+        next_page_button.click()
+        time.sleep(8)
+        # Thereafter, proceed to scrape the list of companies #
+        soup = BeautifulSoup(homepage.page_source, 'html.parser')
+    else:
+        print('You have chosen an invalid page number. Please repick your selection!')
+    
+    # Find the table that matches the specific class parameters and retrieve row details #
+    table = soup.find_all('table', {'id': 'ZBS_restab_2b'})[0]
+    rows = table.find_all('tr')[1:]
+    
+    # Add related company details into companies dictionary #
+    for row in rows:
+        database['COMPANY_NAME'].append(row.a.text)
+        database['COUNTRY'].append(re.split(r'\d+[/]', row.img['src'])[1].split('.')[0].upper())
+        database['MS_LINKS'].append('https://www.marketscreener.com' + str(row.a['href']) + 'company/')
+        mkt_data = row.find('td').find_next_siblings()
+        database['MKT_PRICE'].append(float(mkt_data[1].text.strip()) if (mkt_data[1].text != '') else mkt_data[1].text)
+        database['MKT_CAP_IN_MILLIONS'].append(float(mkt_data[3].text.replace(' ', '')) \
+                                                if (mkt_data[3].text != '') else mkt_data[3].text)
+
+    return database
+
+## Execution conditions ##
+browser, total_pages = start_homepage(url_list[0], ms_login['LOGIN'], ms_login['PASSWORD'])
+while page_number <= math.ceil(total_pages/50):
+    companies = scrape_homepage(browser, page_number)
+    print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
+    page_number += 1        
+browser.close()
+
+
+Save geckodriver in C:\Users\C_YEE\AppData\Local\Continuum\anaconda3
