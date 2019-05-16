@@ -57,67 +57,27 @@ for i in range(len(df)):
 from bs4 import BeautifulSoup
 import datetime as dt
 import Levenshtein as lev
-import numpy as np
-import os
-import pandas as pd
-import re
-import requests
-import xml.etree.ElementTree as ET
-    
-## Initialize variables ##
-ms_url = 'https://www.marketscreener.com/search/instruments/equities/?aComposeInputSearch=s_'
-filepath = 'C:\\Users\\C_YEE\\Projects\\data\\News' 
-
-## Load Scientific Beta Stock Universe ##
-SBSU_data = pd.read_excel(filepath + '\\SBSU.xlsx')
-SBSU_ticker_list = list(SBSU_data['BBG_STOCK_TICKER']) 
-
-## GET request ##
-for ticker in SBSU_ticker_list[1332:1333]:
-    # Assign ticker's country to 'country' variable #
-    country = SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER']==ticker,['country']]['country'].iloc[0]
-    # Send GET request for each ticker #
-    r = requests.get(ms_url + str(ticker))
-    # Parse the html details collected from GET request #
-    first_soup = BeautifulSoup(r.text, 'html.parser')
-    # Find the first table that matches the specific class parameters #
-    table = first_soup.find_all('table', {'class': 'tabBodyLV17'})[0]
-    # Get all row details from the first table #
-    rows = table.find_all('tr')[1:]
-    for row in rows:
-        data = row.find('td').find_next_siblings()
-        if country in data[0].img['title']:
-            url = 'https://www.marketscreener.com' + str(data[1].a['href']) + 'company/'
-            r = requests.get(url)
-            second_soup = BeautifulSoup(r.text, 'html.parser')
-            tables = second_soup.find_all('table', {'class': 'nfvtTab'})
-            for table in tables:
-                if table.find_all('td', {'title': 'Voting rights per share'}):
-                    rows = table.find_all('tr')[1:]
-
-
-## Import Python libraries ## 
-from bs4 import BeautifulSoup
-import datetime as dt
-import Levenshtein as lev
 import math
 import numpy as np
 import pandas as pd
 import re
 import requests
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 import time
     
 
 ## Initialize variables ##
 url_list = ['https://www.marketscreener.com/stock-exchange/shares/',
             'https://www.marketscreener.com/search/instruments/equities/?aComposeInputSearch=s_']
-filepath = 'C:\\Users\\C_YEE\\Projects\\data' 
+filepath = 'C:\\Users\\C_YEE\\Projects\\data\\' 
 ms_login = {'LOGIN': 'clement.yee@scientificbeta.com', 'PASSWORD': 'Sjiboy88!'}
-companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
-             'MKT_CAP_IN_MILLIONS': [], 'MS_LINKS': [], 'SECURITIES_RIC': []}
+#companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
+#             'MS_LINKS': [], 'SECURITIES_RIC': []}
+classes = {'SECURITIES_RIC': [], 'LISTED_COMPOSITES': []}
+shares_info = {'TICKER': [], 'CLASS': [], 'VOTES_PER_SHARE': [], 
+               'SHARES_OUTSTANDING': [], 'SHARES_FLOATING': [], 'SHARES_HELD_BY_COMPANY': []}
 page_number = 1
+
 
 ## Launch Market Screener Home Page with Selenium's webdriver ##
 def start_homepage(url, login_id, login_pw):
@@ -149,10 +109,6 @@ def start_homepage(url, login_id, login_pw):
     return browser, total_pages
 
 
-## Disable Javascript and put the program to temporary rest ##
-#def js_sleep():
-    
-
 ## Scrape all companies from Market Screener Home Page ##
 def scrape_homepage(homepage, page_number, database = companies):
     
@@ -163,11 +119,9 @@ def scrape_homepage(homepage, page_number, database = companies):
         #  do nothing #
     elif page_number > 1:
         # If current page_number is not 1, begin the session on the following page #
-        #next_page_button = WebDriverWait(homepage,8).until(EC.element_to_be_clickable((By.LINK_TEXT, str(page_number))))
         next_page_button = homepage.find_element_by_link_text(str(page_number))
         next_page_button.click()
-        time.sleep(13)
-        
+        time.sleep(12)
         # Thereafter, proceed to scrape the list of companies #
         soup = BeautifulSoup(homepage.page_source, 'html.parser')
     else:
@@ -184,15 +138,95 @@ def scrape_homepage(homepage, page_number, database = companies):
         database['MS_LINKS'].append('https://www.marketscreener.com' + str(row.a['href']) + 'company/')
         mkt_data = row.find('td').find_next_siblings()
         database['MKT_PRICE'].append(float(mkt_data[1].text.strip()) if (mkt_data[1].text != '') else mkt_data[1].text)
-        database['MKT_CAP_IN_MILLIONS'].append(float(mkt_data[3].text.replace(' ', '')) \
-                                                if (mkt_data[3].text != '') else mkt_data[3].text)
+#        database['MKT_CAP_IN_MILLIONS'].append(float(mkt_data[3].replace(' ', '').replace(',', '.')) \
+#                                                if (mkt_data[3].text != '') else mkt_data[3].text)
 
     return database
 
+
 ## Execution conditions ##
-browser, total_pages = start_homepage(url_list[0], ms_login['LOGIN'], ms_login['PASSWORD'])
-while page_number <= math.ceil(total_pages/50):
-    companies = scrape_homepage(browser, page_number)
-    print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
-    page_number += 1        
-browser.close()
+
+## Launch Market Screener browser #
+#browser, total_pages = start_homepage(url_list[0], ms_login['LOGIN'], ms_login['PASSWORD'])
+
+## Scrape companies' web links from browser #
+## Ensure Mozilla add-ons - 'Disable WEBRTC' and 'Reqblock' are installed once browser is initiated #
+#while page_number <= math.ceil(total_pages/50):
+#    companies = scrape_homepage(browser, page_number)
+#    print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
+#    page_number += 1        
+#    
+## Close browser once scrapping process is complete # 
+#browser.close()
+
+# Get RIC, vote and float details by sending GET request to Market Screener #
+url_company_list = list(companies['MS_LINKS'])
+for url in url_company_list[:1]:
+    # Send GET request for each url found in url_company_list #
+    r = requests.get(url)
+    # Parse the html details collected from each GET request #
+    soup = BeautifulSoup(r.text, 'html.parser')
+    # Add RIC in SECURITIES_RIC field #
+    ric = soup.find_all('span', {'class': 'fvTitleInfo'})[0].text.strip()
+    companies['SECURITIES_RIC'].append(ric)
+    
+    # Identify other listed securities #
+    if len(soup.find_all('select', {'id': 'FcPsID'})) == 0:
+        classes['SECURITIES_RIC'].append(ric)
+        classes['LISTED_COMPOSITES'].append(ric)
+    else:
+        composites = soup.find_all('select', {'id': 'FcPsID'})[0].find_all('option')
+        for composite in composites:
+            if re.search(r'[(]\w+\s[-]\s\w+[)]', composite.get_text()):
+                classes['SECURITIES_RIC'].append(ric)
+                classes['LISTED_COMPOSITES'].append(re.split('-', re.search(r'\w+\s[-]\s\w+', 
+                       composite.get_text()).group(0))[0].strip())
+    
+    
+    tables = soup.find_all('table', {'class': 'nfvtTab'})
+    for table in tables:
+        if table.find_all('td', {'title': 'Voting rights per share'}):
+            rows = table.find_all('tr')[1:]
+                    
+    
+### Load Scientific Beta Stock Universe ##
+#SBSU_data = pd.read_excel(filepath + '\\SBSU.xlsx')
+#SBSU_ticker_list = list(SBSU_data['BBG_STOCK_TICKER']) 
+
+
+#    # Parse the html details collected from GET request #
+#    soup = BeautifulSoup(r.text, 'html.parser')
+#    # Find the first table that matches the specific class parameters #
+#    table = soup.find_all('table', {'class': 'tabBodyLV17'})[0]
+#    # Get all row details from the first table #
+#    rows = table.find_all('tr')[1:]
+#    for row in rows:
+#        data = row.find('td').find_next_siblings()
+#        if country in data[0].img['title']:
+#            url = 'https://www.marketscreener.com' + str(data[1].a['href']) + 'company/'
+#            r = requests.get(url)
+    
+### Initialize variables ##
+#reuters_url = 'https://www.reuters.com/finance/stocks/lookup?searchType=any&comSortBy=marketcap&sortBy=&dateRange=&search='
+#filepath = 'C:\\Users\\C_YEE\\Projects\\data\\News' 
+#
+### Load Scientific Beta Stock Universe ##
+#SBSU_data = pd.read_excel(filepath + '\\SBSU.xlsx')
+#SBSU_ticker_list = list(SBSU_data['BBG_STOCK_TICKER'])
+#SBSU_data['REUTERS_COMPANY'] = np.nan
+#SBSU_data['REUTERS_RIC'] = np.nan
+#SBSU_data['REUTERS_EXCHANGE'] = np.nan
+#SBSU_data['SIMILARITY_RATIO'] = np.nan
+#counter = 0
+#
+## Parse the first table with each ticker #
+#for ticker in SBSU_ticker_list:
+#    table = pd.read_html(reuters_url + str(ticker), header = 0)[0]
+#    # Update the respective columns in SBSU_data #
+#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['REUTERS_COMPANY']] = table.iloc[0,0]
+#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['REUTERS_RIC']] = table.iloc[0,1].split('.')[0]
+#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['REUTERS_EXCHANGE']] = table.iloc[0,2]
+#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['SIMILARITY_RATIO']] = \
+#    lev.ratio(SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['companyName']]['companyName'].iloc[0] , table.iloc[0,0])
+#    counter += 1
+#    print('Progress: %d of %d' % (counter, len(SBSU_data)))
