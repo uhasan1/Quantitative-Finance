@@ -73,9 +73,10 @@ filepath = 'C:\\Users\\C_YEE\\Projects\\data\\'
 ms_login = {'LOGIN': 'clement.yee@scientificbeta.com', 'PASSWORD': 'Sjiboy88!'}
 #companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
 #             'MS_LINKS': [], 'SECURITIES_RIC': []}
-classes = {'SECURITIES_RIC': [], 'LISTED_COMPOSITES': []}
-shares_info = {'TICKER': [], 'CLASS': [], 'VOTES_PER_SHARE': [], 
-               'SHARES_OUTSTANDING': [], 'SHARES_FLOATING': [], 'SHARES_HELD_BY_COMPANY': []}
+classes = {'SECURITIES_RIC': [], 'LISTED_COMPOSITES': [], 'MS_LINKS': []}
+shares_info = {'TICKER': [], 'CLASS': [], 'MS_LINKS': [], 
+               'NUM_VOTES_PER_SHARE': [], 'NUM_SHARES_OUTSTANDING': [], 'NUM_SHARES_FLOATING': [], 
+               'NUM_SHARES_HELD_BY_COMPANY': []}
 page_number = 1
 
 
@@ -110,7 +111,7 @@ def start_homepage(url, login_id, login_pw):
 
 
 ## Scrape all companies from Market Screener Home Page ##
-def scrape_homepage(homepage, page_number, database = companies):
+def scrape_homepage(homepage, page_number, database):
     
     # Check page_number to determine course of action #
     if page_number == 1:
@@ -152,16 +153,22 @@ def scrape_homepage(homepage, page_number, database = companies):
 ## Scrape companies' web links from browser #
 ## Ensure Mozilla add-ons - 'Disable WEBRTC' and 'Reqblock' are installed once browser is initiated #
 #while page_number <= math.ceil(total_pages/50):
-#    companies = scrape_homepage(browser, page_number)
+#    companies = scrape_homepage(browser, page_number, companies)
 #    print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
 #    page_number += 1        
 #    
 ## Close browser once scrapping process is complete # 
 #browser.close()
 
+## Load companies.xlsx ##
+companies_loaded = pd.read_excel('companies.xlsx')
+companies = companies_loaded.to_dict('list')
+companies['SECURITIES_RIC'] = []
+
 # Get RIC, vote and float details by sending GET request to Market Screener #
 url_company_list = list(companies['MS_LINKS'])
-for url in url_company_list[:1]:
+counter = 0
+for url in url_company_list:
     # Send GET request for each url found in url_company_list #
     r = requests.get(url)
     # Parse the html details collected from each GET request #
@@ -170,10 +177,11 @@ for url in url_company_list[:1]:
     ric = soup.find_all('span', {'class': 'fvTitleInfo'})[0].text.strip()
     companies['SECURITIES_RIC'].append(ric)
     
-    # Identify other listed securities #
+    # Identify other listed securities belonging to the same company/issuer #
     if len(soup.find_all('select', {'id': 'FcPsID'})) == 0:
         classes['SECURITIES_RIC'].append(ric)
         classes['LISTED_COMPOSITES'].append(ric)
+        classes['MS_LINKS'].append(url)
     else:
         composites = soup.find_all('select', {'id': 'FcPsID'})[0].find_all('option')
         for composite in composites:
@@ -181,52 +189,30 @@ for url in url_company_list[:1]:
                 classes['SECURITIES_RIC'].append(ric)
                 classes['LISTED_COMPOSITES'].append(re.split('-', re.search(r'\w+\s[-]\s\w+', 
                        composite.get_text()).group(0))[0].strip())
-    
-    
+                classes['MS_LINKS'].append(url)
+                
+    # Get vote and float details #
     tables = soup.find_all('table', {'class': 'nfvtTab'})
     for table in tables:
         if table.find_all('td', {'title': 'Voting rights per share'}):
             rows = table.find_all('tr')[1:]
-                    
+            for row in rows:
+                data = row.find_all('td')[:7]
+                # Update RIC in TICKER field #
+                shares_info['TICKER'].append(ric)
+                # Update url in MS_LINKS field #
+                shares_info['MS_LINKS'].append(url)
+                # Update share class, i.e. data[0], in CLASS field #
+                shares_info['CLASS'].append(data[0].text.strip())
+                # Update number of votes per share, i.e. data[1], in NUM_VOTES_PER_SHARE field #
+                shares_info['NUM_VOTES_PER_SHARE'].append(float(data[1].text.replace(',', '').strip()))    
+                # Update number of shares outstanding, i.e. data[2], in NUM_SHARES_OUTSTANDING field #
+                shares_info['NUM_SHARES_OUTSTANDING'].append(int(data[2].text.replace(',', '').strip()))  
+                # Update number of floating shares, i.e. data[3], in NUM_SHARES_FLOATING field #
+                shares_info['NUM_SHARES_FLOATING'].append(int(data[3].text.replace(',', '').strip()))  
+                # Update number of company-owned (insider) shares, i.e. data[5], in NUM_SHARES_HELD_BY_COMPANY field #
+                shares_info['NUM_SHARES_HELD_BY_COMPANY'].append(int(data[5].text.replace(',', '').strip()))
     
-### Load Scientific Beta Stock Universe ##
-#SBSU_data = pd.read_excel(filepath + '\\SBSU.xlsx')
-#SBSU_ticker_list = list(SBSU_data['BBG_STOCK_TICKER']) 
-
-
-#    # Parse the html details collected from GET request #
-#    soup = BeautifulSoup(r.text, 'html.parser')
-#    # Find the first table that matches the specific class parameters #
-#    table = soup.find_all('table', {'class': 'tabBodyLV17'})[0]
-#    # Get all row details from the first table #
-#    rows = table.find_all('tr')[1:]
-#    for row in rows:
-#        data = row.find('td').find_next_siblings()
-#        if country in data[0].img['title']:
-#            url = 'https://www.marketscreener.com' + str(data[1].a['href']) + 'company/'
-#            r = requests.get(url)
-    
-### Initialize variables ##
-#reuters_url = 'https://www.reuters.com/finance/stocks/lookup?searchType=any&comSortBy=marketcap&sortBy=&dateRange=&search='
-#filepath = 'C:\\Users\\C_YEE\\Projects\\data\\News' 
-#
-### Load Scientific Beta Stock Universe ##
-#SBSU_data = pd.read_excel(filepath + '\\SBSU.xlsx')
-#SBSU_ticker_list = list(SBSU_data['BBG_STOCK_TICKER'])
-#SBSU_data['REUTERS_COMPANY'] = np.nan
-#SBSU_data['REUTERS_RIC'] = np.nan
-#SBSU_data['REUTERS_EXCHANGE'] = np.nan
-#SBSU_data['SIMILARITY_RATIO'] = np.nan
-#counter = 0
-#
-## Parse the first table with each ticker #
-#for ticker in SBSU_ticker_list:
-#    table = pd.read_html(reuters_url + str(ticker), header = 0)[0]
-#    # Update the respective columns in SBSU_data #
-#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['REUTERS_COMPANY']] = table.iloc[0,0]
-#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['REUTERS_RIC']] = table.iloc[0,1].split('.')[0]
-#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['REUTERS_EXCHANGE']] = table.iloc[0,2]
-#    SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['SIMILARITY_RATIO']] = \
-#    lev.ratio(SBSU_data.loc[SBSU_data['BBG_STOCK_TICKER'] == ticker, ['companyName']]['companyName'].iloc[0] , table.iloc[0,0])
-#    counter += 1
-#    print('Progress: %d of %d' % (counter, len(SBSU_data)))
+    # Update job progress of getting RIC, vote and float details #
+    counter += 1
+    print('Request progress: %d of %d' % (counter, len(url_company_list)))
