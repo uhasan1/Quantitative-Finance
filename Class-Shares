@@ -160,15 +160,22 @@ def scrape_homepage(homepage, page_number, database):
 ## Close browser once scrapping process is complete # 
 #browser.close()
 
-## Load companies.xlsx ##
-companies_loaded = pd.read_excel('companies.xlsx')
-companies = companies_loaded.to_dict('list')
-companies['SECURITIES_RIC'] = []
+## Load companies.xlsx #
+#companies_loaded = pd.read_excel('companies.xlsx')
+#companies = companies_loaded.to_dict('list')
+#companies['SECURITIES_RIC'] = []
+
+## Drop duplicate companies by MS_LINKS #
+#del companies['SECURITIES_RIC']
+#df = pd.DataFrame(companies)
+#df.drop_duplicates(subset=['MS_LINKS'], inplace=True)
+#companies = df.to_dict('list')
+#companies['SECURITIES_RIC'] = []
 
 # Get RIC, vote and float details by sending GET request to Market Screener #
 url_company_list = list(companies['MS_LINKS'])
-counter = 0
-for url in url_company_list:
+counter = 2237
+for url in url_company_list[2237:]:
     # Send GET request for each url found in url_company_list #
     r = requests.get(url)
     # Parse the html details collected from each GET request #
