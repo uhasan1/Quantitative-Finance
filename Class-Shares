@@ -71,8 +71,8 @@ url_list = ['https://www.marketscreener.com/stock-exchange/shares/',
             'https://www.marketscreener.com/search/instruments/equities/?aComposeInputSearch=s_']
 filepath = 'C:\\Users\\C_YEE\\Projects\\data\\' 
 ms_login = {'LOGIN': 'clement.yee@scientificbeta.com', 'PASSWORD': 'Sjiboy88!'}
-#companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
-#             'MS_LINKS': [], 'SECURITIES_RIC': []}
+companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
+             'MS_LINKS': [], 'SECURITIES_RIC': []}
 classes = {'SECURITIES_RIC': [], 'LISTED_COMPOSITES': [], 'MS_LINKS': []}
 shares_info = {'TICKER': [], 'CLASS': [], 'MS_LINKS': [], 
                'NUM_VOTES_PER_SHARE': [], 'NUM_SHARES_OUTSTANDING': [], 'NUM_SHARES_FLOATING': [], 
@@ -103,10 +103,13 @@ def start_homepage(url, login_id, login_pw):
     password.submit()
     
     # Set waiting time for loading process #
-    time.sleep(8)
+    # Use waiting time to set up the Mozilla add-ons - Disable WEBRTC and REQBLOCK #
+    time.sleep(120)
     
+    # Compute total number of pages #
     soup = BeautifulSoup(browser.page_source, 'html.parser')
     total_pages = int(soup.find_all('div', {'id': 'div_res_val'})[0].text.replace(' ', ''))
+    
     return browser, total_pages
 
 
@@ -147,18 +150,17 @@ def scrape_homepage(homepage, page_number, database):
 
 ## Execution conditions ##
 
-## Launch Market Screener browser #
-#browser, total_pages = start_homepage(url_list[0], ms_login['LOGIN'], ms_login['PASSWORD'])
+# Launch Market Screener browser #
+browser, total_pages = start_homepage(url_list[0], ms_login['LOGIN'], ms_login['PASSWORD'])
 
-## Scrape companies' web links from browser #
-## Ensure Mozilla add-ons - 'Disable WEBRTC' and 'Reqblock' are installed once browser is initiated #
-#while page_number <= math.ceil(total_pages/50):
-#    companies = scrape_homepage(browser, page_number, companies)
-#    print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
-#    page_number += 1        
-#    
-## Close browser once scrapping process is complete # 
-#browser.close()
+# Scrape companies' web links from browser #
+while page_number <= math.ceil(total_pages/50):
+    companies = scrape_homepage(browser, page_number, companies)
+    print('WebScrapping progress: %d of %d' % (page_number, math.ceil(total_pages/50)))
+    page_number += 1        
+    
+# Close browser once scrapping process is complete # 
+browser.close()
 
 ## Load companies.xlsx #
 #companies_loaded = pd.read_excel('companies.xlsx')
@@ -174,15 +176,15 @@ def scrape_homepage(homepage, page_number, database):
 
 # Get RIC, vote and float details by sending GET request to Market Screener #
 url_company_list = list(companies['MS_LINKS'])
-counter = 2237
-for url in url_company_list[2237:]:
+counter = 0
+for url in url_company_list:
     # Send GET request for each url found in url_company_list #
     r = requests.get(url)
     # Parse the html details collected from each GET request #
     soup = BeautifulSoup(r.text, 'html.parser')
     # Add RIC in SECURITIES_RIC field #
     ric = soup.find_all('span', {'class': 'fvTitleInfo'})[0].text.strip()
-    companies['SECURITIES_RIC'].append(ric)
+#    companies['SECURITIES_RIC'].append(ric)
     
     # Identify other listed securities belonging to the same company/issuer #
     if len(soup.find_all('select', {'id': 'FcPsID'})) == 0:
@@ -219,6 +221,9 @@ for url in url_company_list[2237:]:
                 shares_info['NUM_SHARES_FLOATING'].append(int(data[3].text.replace(',', '').strip()))  
                 # Update number of company-owned (insider) shares, i.e. data[5], in NUM_SHARES_HELD_BY_COMPANY field #
                 shares_info['NUM_SHARES_HELD_BY_COMPANY'].append(int(data[5].text.replace(',', '').strip()))
+    
+    if 'https://www.marketscreener.com/BAY-NATIONAL-CORPORATION-17017/company/' in url:
+        break
     
     # Update job progress of getting RIC, vote and float details #
     counter += 1
