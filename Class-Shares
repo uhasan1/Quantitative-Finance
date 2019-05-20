@@ -55,8 +55,8 @@ for i in range(len(df)):
 ## Another way to scrape class shares information from Market Screener ##
 ## Import Python libraries ## 
 from bs4 import BeautifulSoup
-import datetime as dt
-import Levenshtein as lev
+from fuzzywuzzy import process
+
 import math
 import numpy as np
 import pandas as pd
@@ -67,8 +67,7 @@ import time
     
 
 ## Initialize variables ##
-url_list = ['https://www.marketscreener.com/stock-exchange/shares/',
-            'https://www.marketscreener.com/search/instruments/equities/?aComposeInputSearch=s_']
+url_list = ['https://www.marketscreener.com/stock-exchange/shares/']
 filepath = 'C:\\Users\\C_YEE\\Projects\\data\\' 
 ms_login = {'LOGIN': 'clement.yee@scientificbeta.com', 'PASSWORD': 'Sjiboy88!'}
 companies = {'COMPANY_NAME': [], 'COUNTRY': [], 'MKT_PRICE': [], 
@@ -120,7 +119,6 @@ def scrape_homepage(homepage, page_number, database):
     if page_number == 1:
         # If current page_number is 1, proceed to scrape the list of companies #
         soup = BeautifulSoup(homepage.page_source, 'html.parser')
-        #  do nothing #
     elif page_number > 1:
         # If current page_number is not 1, begin the session on the following page #
         next_page_button = homepage.find_element_by_link_text(str(page_number))
@@ -161,18 +159,6 @@ while page_number <= math.ceil(total_pages/50):
     
 # Close browser once scrapping process is complete # 
 browser.close()
-
-## Load companies.xlsx #
-#companies_loaded = pd.read_excel('companies.xlsx')
-#companies = companies_loaded.to_dict('list')
-#companies['SECURITIES_RIC'] = []
-
-## Drop duplicate companies by MS_LINKS #
-#del companies['SECURITIES_RIC']
-#df = pd.DataFrame(companies)
-#df.drop_duplicates(subset=['MS_LINKS'], inplace=True)
-#companies = df.to_dict('list')
-#companies['SECURITIES_RIC'] = []
 
 # Get RIC, vote and float details by sending GET request to Market Screener #
 url_company_list = list(companies['MS_LINKS'])
@@ -222,9 +208,55 @@ for url in url_company_list:
                 # Update number of company-owned (insider) shares, i.e. data[5], in NUM_SHARES_HELD_BY_COMPANY field #
                 shares_info['NUM_SHARES_HELD_BY_COMPANY'].append(int(data[5].text.replace(',', '').strip()))
     
-    if 'https://www.marketscreener.com/BAY-NATIONAL-CORPORATION-17017/company/' in url:
-        break
-    
     # Update job progress of getting RIC, vote and float details #
     counter += 1
     print('Request progress: %d of %d' % (counter, len(url_company_list)))
+
+# Ingest SBSU data from Excel workbook #
+SBSU_data = pd.read_excel('COMPANIES.xlsx', sheet_name='Synthese')
+
+# Create dictionary to store both shares and SBSU_data #
+SBSU_shares = SBSU_data[['sciBetaId', 'isin', 'sedol', 'RIC', 'companyName']].to_dict('list')
+SBSU_shares['sciBetaCoName'] = SBSU_shares['companyName']
+del SBSU_shares['companyName']
+SBSU_shares['MSCoName'] = []
+
+# Manipulate the sciBetaCoName to increase the accuracy of the matched records #
+SBSU_companies = []
+for company in SBSU_shares['sciBetaCoName']:
+    # (a) Remove all non-alphanumeric characters, e.g. punctutations #
+    # (b) Standardize the case of the company names #
+    # (c) Remove redundant spaces #
+    SBSU_companies.append(company.replace(r'[^\w\s]', ' ').upper().strip()) 
+SBSU_shares['sciBetaCoName'] = SBSU_companies
+    
+# Create list to store company names extracted from Market Screener weblinks #
+MS_companies = []
+for weblink in list(shares_info['MS_LINKS']):
+    MS_companies.append(' '.join(re.split('-', re.split('/', weblink)[3])[:-1]))
+shares_info['MSCoName'] = MS_companies
+    
+# Drop duplicates in MS_companies list #
+MS_companies = list(set(MS_companies))
+
+# Perform fuzzy matching between company names in MS and SBSU_data #
+counter = 0
+for company in SBSU_companies:
+    best_guess = process.extractOne(company, MS_companies)
+    # Pick record if its matching percentage is at least 90% #
+    if best_guess[1] >= 85:
+        SBSU_shares['MSCoName'].append(best_guess[0])
+    # Return nan if its matching percentage is less than 90% #
+    else:
+        SBSU_shares['MSCoName'].append(np.nan)
+    # Increment counter at the end of each loop #
+    counter += 1
+    print('Progress: %d of %d completed' % (counter, len(SBSU_companies)))
+    
+# Merge the datasets: SBSU_shares and shares_info # 
+df_SBSU = pd.DataFrame(SBSU_shares)
+df_shares = pd.DataFrame(shares_info)
+df_SBSU = pd.merge(df_SBSU, df_shares, how='left', on='MSCoName')
+
+# Download the combined dataset for further analysis #
+df_SBSU.to_excel('test.xlsx', sheet_name='COMBINED', index=False)    
