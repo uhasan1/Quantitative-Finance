@@ -216,7 +216,7 @@ for url in url_company_list:
 SBSU_data = pd.read_excel('COMPANIES.xlsx', sheet_name='Synthese')
 
 # Create dictionary to store both shares and SBSU_data #
-SBSU_shares = SBSU_data[['sciBetaId', 'isin', 'sedol', 'RIC', 'companyName']].to_dict('list')
+SBSU_shares = SBSU_data[['sciBetaId', 'isin', 'sedol', 'RIC', 'companyName', 'country']].to_dict('list')
 SBSU_shares['sciBetaCoName'] = SBSU_shares['companyName']
 del SBSU_shares['companyName']
 SBSU_shares['MSCoName'] = []
@@ -256,6 +256,9 @@ for company in SBSU_companies:
 # Merge the datasets: SBSU_shares and shares_info # 
 df_SBSU = pd.DataFrame(SBSU_shares)
 df_shares = pd.DataFrame(shares_info)
+df_shares = df_shares[['MSCoName', 'CLASS', 'MS_LINKS', 
+                       'NUM_VOTES_PER_SHARE', 'NUM_SHARES_OUTSTANDING', 'NUM_SHARES_FLOATING', 
+                       'NUM_SHARES_HELD_BY_COMPANY', 'REMARKS']]
 df_SBSU = pd.merge(df_SBSU, df_shares, how='left', on='MSCoName')
 
 # Download the combined dataset for further analysis #
